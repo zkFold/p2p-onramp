@@ -10,6 +10,7 @@ library zkfold-p2p
         ZkFold.P2P.Payment
     build-depends:
         base                          >= 4.9 && < 5,
+        mtl                                        ,
         zkfold-base
     hs-source-dirs: src
     default-extensions:
@@ -46,6 +47,7 @@ library zkfold-p2p
       StandaloneDeriving,
       StandaloneKindSignatures,
       TupleSections,
+      TypeApplications,
       TypeFamilies,
       ViewPatterns
 
