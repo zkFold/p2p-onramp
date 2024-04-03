@@ -1,8 +1,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 module ZkFold.P2P.Payment where
 
-import           Prelude                        hiding (Bool, Eq ((==)), (*), (+), length, splitAt)
+import           Prelude                  hiding (Bool, Eq ((==)), (*), (+), elem, length, splitAt)
 import           Control.Monad.State.Lazy        (evalState, state)
+import           Data.Foldable                   (find)
 
 import           ZkFold.Prelude
 import           ZkFold.Base.Algebra.Basic.Class
@@ -67,4 +68,4 @@ instance (Arithmetizable a (UInt 64 x), Arithmetizable a x) => Arithmetizable a 
 zkSmartContract ::
     Eq (Bool a) (Offer a) =>
     Transaction input outputs Offer a -> Offer a -> Bool a
-zkSmartContract tx offer = txDatum tx == offer
+zkSmartContract tx offer = elem offer $ txiDatum <$> txInputs tx
