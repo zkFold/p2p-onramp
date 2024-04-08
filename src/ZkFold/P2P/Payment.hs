@@ -1,7 +1,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module ZkFold.P2P.Payment where
 
-import           Prelude                  hiding (Bool, Eq ((==)), (*), (+), elem, length, splitAt)
+import           Prelude                  hiding (Bool, Eq ((==)), (&&), (*), (+), elem, length, splitAt)
 import           Control.Monad.State.Lazy        (evalState, state)
 import           Data.Foldable                   (find)
 
@@ -44,7 +44,7 @@ deriving instance
     ) => Arithmetizable i (Offer a)
 
 newtype MatchedOffer a = MatchedOffer
-    (FiatAccount a, (UInt 64 a, (ISO427 a, Address a)))
+    (Address a, (FiatAccount a, (UInt 64 a, ISO427 a)))
     deriving Haskell.Eq
 
 deriving instance
@@ -52,7 +52,13 @@ deriving instance
     , Arithmetizable i a
     ) => Arithmetizable i (MatchedOffer a)
 
+hash :: datum a -> a
+hash = undefined
+
 zkSmartContract ::
-    Eq (Bool a) (Offer a) =>
-    Transaction rinputs input outputs tokens Offer a -> Offer a -> Bool a
-zkSmartContract tx offer = elem offer $ txiDatum <$> txInputs tx
+    (Eq (Bool a) a, Eq (Bool a) (Offer a))
+    => Address a -> Offer a -> Transaction ris is os ts Offer a -> Bool a
+zkSmartContract address (Offer offer) tx =
+    let match = MatchedOffer (address, offer) in
+    elem (Offer offer) (txiDatum <$> txInputs tx)
+ && elem (hash match) (txoDatumHash <$> txOutputs tx)
