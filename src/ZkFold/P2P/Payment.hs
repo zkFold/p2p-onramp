@@ -5,67 +5,54 @@ import           Prelude                  hiding (Bool, Eq ((==)), (*), (+), ele
 import           Control.Monad.State.Lazy        (evalState, state)
 import           Data.Foldable                   (find)
 
+import qualified Prelude  as Haskell              (Eq ((==)))
+
 import           ZkFold.Prelude
 import           ZkFold.Base.Algebra.Basic.Class
 import           ZkFold.Base.Data.Vector
-import           ZkFold.Symbolic.Cardano.Types.Tx
-import           ZkFold.Symbolic.Cardano.Types.Address
+import           ZkFold.Symbolic.Cardano.Types
 import           ZkFold.Symbolic.Compiler
 import           ZkFold.Symbolic.Data.Bool
 import           ZkFold.Symbolic.Data.Eq
 import           ZkFold.Symbolic.Data.UInt
 
-
 -- Should include part of PAN, account number holder, probably with PCI DSS masking
 -- Can be finished when arithmetizable ByteStrings be ready
-data FiatAccount a = FiatAccount a
+newtype FiatAccount a = FiatAccount a
+    deriving Haskell.Eq
 
-instance (Ring a, Finite a, MultiplicativeGroup a) => Eq (Bool a) (FiatAccount a)
+-- deriving instance
+--    (Ring a, Finite a, MultiplicativeGroup a, Eq (Bool a) a) => Eq (Bool a) (FiatAccount a)
 
--- TODO
-instance Arithmetizable a x => Arithmetizable a (FiatAccount x) where
+deriving instance
+    Arithmetizable i a => Arithmetizable i (FiatAccount a)
 
-data ISO427 a = ISO427 a a a
+newtype ISO427 a = ISO427 (a, (a, a))
+    deriving Haskell.Eq
 
-instance Arithmetizable a x => Arithmetizable a (ISO427 x) where
-    arithmetize (ISO427 o1 o2 o3) =
-        (\o1 o2 o3 -> o1 <> o2 <> o3)
-            <$> arithmetize o1
-            <*> arithmetize o2
-            <*> arithmetize o3
+deriving instance
+    Arithmetizable i a
+    => Arithmetizable i (ISO427 a)
 
-data Offer a = Offer
-    { oFiatAccount :: FiatAccount a
-    , oFiatAmount :: UInt 64 a
-    , oFiatCurrency :: ISO427 a
-    , oCardanoAddress :: Address a
-    , oCardanoAmount :: UInt 64 a
-    }
+newtype Offer a = Offer
+    (FiatAccount a, (UInt 64 a, ISO427 a))
+    deriving Haskell.Eq
 
-instance (Arithmetizable a (UInt 64 x), Arithmetizable a x) => Arithmetizable a (Offer x) where
-    arithmetize (Offer fAccount fAmount fCurrency cAddress cAmount) =
-        (\fac fam fc cad cam -> fac <> fam <> fc <> cad <> cam)
-            <$> arithmetize fAccount
-            <*> arithmetize fAmount
-            <*> arithmetize fCurrency
-            <*> arithmetize cAddress
-            <*> arithmetize cAmount
-    restore offer =
-        if length offer == typeSize @a @(Offer x)
-        then flip evalState offer $ Offer
-            <$> do restore <$> do state . splitAt $ typeSize @a @(FiatAccount x)
-            <*> do restore <$> do state . splitAt $ typeSize @a @(UInt 64 x)
-            <*> do restore <$> do state . splitAt $ typeSize @a @(ISO427 x)
-            <*> do restore <$> do state . splitAt $ typeSize @a @(Address x)
-            <*> do restore <$> do state . splitAt $ typeSize @a @(UInt 64 x)
-        else error "restore Offer: wrong number of arguments"
-    typeSize = typeSize @a @(FiatAccount x)
-             + typeSize @a @(UInt 64 x)
-             + typeSize @a @(ISO427 x)
-             + typeSize @a @(Address x)
-             + typeSize @a @(UInt 64 x)
+deriving instance
+    ( Arithmetizable i (UInt 64 a)
+    , Arithmetizable i a
+    ) => Arithmetizable i (Offer a)
+
+newtype MatchedOffer a = MatchedOffer
+    (FiatAccount a, (UInt 64 a, (ISO427 a, Address a)))
+    deriving Haskell.Eq
+
+deriving instance
+    ( Arithmetizable i (UInt 64 a)
+    , Arithmetizable i a
+    ) => Arithmetizable i (MatchedOffer a)
 
 zkSmartContract ::
     Eq (Bool a) (Offer a) =>
-    Transaction input outputs Offer a -> Offer a -> Bool a
+    Transaction rinputs input outputs tokens Offer a -> Offer a -> Bool a
 zkSmartContract tx offer = elem offer $ txiDatum <$> txInputs tx
