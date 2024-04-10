@@ -8,7 +8,10 @@ extra-source-files: CHANGELOG.md
 library zkfold-p2p
     exposed-modules:
         ZkFold.P2P.Payment
-    build-depends: base, mtl, zkfold-base
+    build-depends:
+        base                          >= 4.9 && < 5,
+        mtl                                        ,
+        zkfold-base
     hs-source-dirs: src
     default-extensions:
       BangPatterns,
@@ -50,6 +53,6 @@ library zkfold-p2p
 
 executable p2p-app
     main-is:          Main.hs
-    build-depends:    base
+    build-depends:    base ^>=4.17.2.1
     hs-source-dirs:   app
     default-language: Haskell2010

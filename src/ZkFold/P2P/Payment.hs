@@ -13,7 +13,6 @@ import           ZkFold.Base.Data.Vector
 import           ZkFold.Symbolic.Cardano.Types
 import           ZkFold.Symbolic.Compiler
 import           ZkFold.Symbolic.Data.Bool
-import           ZkFold.Symbolic.Data.ByteString
 import           ZkFold.Symbolic.Data.Eq
 import           ZkFold.Symbolic.Data.UInt
 
@@ -50,18 +49,16 @@ newtype MatchedOffer a = MatchedOffer
 
 deriving instance
     ( Arithmetizable i (UInt 64 a)
-    , Arithmetizable i (ByteString 4 a)
-    , Arithmetizable i (ByteString 224 a)
     , Arithmetizable i a
     ) => Arithmetizable i (MatchedOffer a)
 
-hash :: datum a -> ByteString 256 a
+hash :: datum a -> a
 hash = undefined
 
 zkSmartContract ::
-    (Eq (Bool a) (ByteString 256 a), Eq (Bool a) (Offer a))
+    (Eq (Bool a) a, Eq (Bool a) (Offer a))
     => Address a -> Offer a -> Transaction ris is os ts Offer a -> Bool a
-zkSmartContract address offer@(Offer o) tx =
-    let match = MatchedOffer (address, o) in
-    elem (hash offer) (txiDatumHash <$> txInputs tx)
+zkSmartContract address (Offer offer) tx =
+    let match = MatchedOffer (address, offer) in
+    elem (Offer offer) (txiDatum <$> txInputs tx)
  && elem (hash match) (txoDatumHash <$> txOutputs tx)
