@@ -1,0 +1,6 @@
+cradle:
+  cabal:
+    - path: "./src"
+      component: "lib:p2p-onramp"
+    - path: "./app"
+      component: "p2p-onramp:exe:p2p-onramp-app"

@@ -1,13 +1,21 @@
-cabal-version:      2.4
+cabal-version:      3.0
+
 name:               p2p-onramp
 version:            0.1.0.0
+synopsis:           ZkFold's P2P on-ramp application
+homepage:           zkfold.io
 author:             Vladimir Sinyakov, Pavel Sokolov, Murat Kasimov, Vladimir Morozov
 maintainer:         info@zkfold.io
 extra-source-files: CHANGELOG.md
+license-file:       LICENSE
+build-type:         Simple
 
-library zkfold-p2p
+description:
+  This repository contains the source code for ZkFold's P2P on-ramp application.
+
+library
     exposed-modules:
-        ZkFold.P2P.Payment
+        ZkFold.P2P.Contract
     build-depends:
         base                          >= 4.9 && < 5,
         mtl                                        ,
@@ -51,8 +59,9 @@ library zkfold-p2p
       TypeFamilies,
       ViewPatterns
 
-executable p2p-app
+executable p2p-onramp-app
     main-is:          Main.hs
-    build-depends:    base ^>=4.17.2.1
+    build-depends:
+        base
     hs-source-dirs:   app
     default-language: Haskell2010
