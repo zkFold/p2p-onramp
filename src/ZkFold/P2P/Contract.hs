@@ -11,8 +11,8 @@ import qualified Prelude  as Haskell              (Eq ((==)))
 
 import           ZkFold.Base.Algebra.Basic.Class  (fromConstant)
 import           ZkFold.Symbolic.Cardano.Types
-import           ZkFold.Symbolic.Compiler         (Arithmetizable)
-import           ZkFold.Symbolic.Data.Bool        (Bool, any)
+import           ZkFold.Symbolic.Compiler         (Arithmetizable, SomeArithmetizable)
+import           ZkFold.Symbolic.Data.Bool        (Bool(..), BoolType (..), any)
 import           ZkFold.Symbolic.Data.ByteString  (ByteString)
 import           ZkFold.Symbolic.Data.Conditional (Conditional(..))
 import           ZkFold.Symbolic.Data.Eq          (Eq(..))
@@ -53,18 +53,22 @@ deriving instance
     ) => Arithmetizable a (FiatTransfer a)
 
 newtype MatchedOffer a = MatchedOffer
-    ((Address a, FiatAccount a), Offer a)
+    (Address a, FiatTransfer a, ByteString 256 a)
     deriving Haskell.Eq
 
 deriving instance
     ( Arithmetizable a (UInt 64 a)
     , Arithmetizable a (ByteString 4 a)
     , Arithmetizable a (ByteString 224 a)
+    , Arithmetizable a (ByteString 256 a)
     , Arithmetizable a a
     ) => Arithmetizable a (MatchedOffer a)
 
 hashMatchedOffer :: MatchedOffer a -> ByteString 256 a
 hashMatchedOffer = undefined
+
+verifyFiatTransferSignature :: ByteString 256 a -> FiatTransfer a -> ByteString 256 a -> Bool a
+verifyFiatTransferSignature = undefined
 
 p2pMatchedOrderContract :: forall inputs rinputs outputs tokens a .
     ( Symbolic a
@@ -72,8 +76,8 @@ p2pMatchedOrderContract :: forall inputs rinputs outputs tokens a .
     , Eq (Bool a) (ByteString 256 a)
     , Conditional (Bool a) (Maybe (Output () tokens a))
     )
-    => Transaction inputs rinputs  outputs tokens () a -> MatchedOffer a -> Bool a
-p2pMatchedOrderContract tx mo@(MatchedOffer ((addr, sender), Offer (recipient, (val, cur)))) =
+    => ByteString 256 a -> Transaction inputs rinputs  outputs tokens () a -> MatchedOffer a -> Bool a
+p2pMatchedOrderContract vk tx mo@(MatchedOffer (addr, transfer, signature)) =
     let h                  = hashMatchedOffer mo
         f = (\o acc -> bool @(Bool a) acc (Just o) (txoDatumHash o == h))
         -- TODO: Simplify this using symbolic `find`.
@@ -81,4 +85,4 @@ p2pMatchedOrderContract tx mo@(MatchedOffer ((addr, sender), Offer (recipient, (
             fmap (\(Input (_, o)) -> o) $ txInputs tx
         -- TODO: Instead of `zero`, it should be the hash of `()`.
         txo                = Output (addr, (v, fromConstant 0 :: ByteString 256 a)) :: Output () tokens a
-    in any (\o -> txo == o) $ txOutputs tx
+    in any (\o -> txo == o) (txOutputs tx) && verifyFiatTransferSignature vk transfer signature
