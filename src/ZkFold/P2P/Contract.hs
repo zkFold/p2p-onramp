@@ -11,7 +11,7 @@ import qualified Prelude  as Haskell              (Eq ((==)))
 
 import           ZkFold.Base.Algebra.Basic.Class  (fromConstant)
 import           ZkFold.Symbolic.Cardano.Types
-import           ZkFold.Symbolic.Compiler         (Arithmetizable, SomeArithmetizable)
+import           ZkFold.Symbolic.Compiler         (SymbolicData, SomeArithmetizable)
 import           ZkFold.Symbolic.Data.Bool        (Bool(..), BoolType (..), any)
 import           ZkFold.Symbolic.Data.ByteString  (ByteString)
 import           ZkFold.Symbolic.Data.Conditional (Conditional(..))
@@ -25,44 +25,45 @@ newtype FiatAccount a = FiatAccount a
     deriving Haskell.Eq
 
 deriving instance
-    Arithmetizable i a => Arithmetizable i (FiatAccount a)
+    SymbolicData i a => SymbolicData i (FiatAccount a)
 
 newtype ISO427 a = ISO427 (a, (a, a))
     deriving Haskell.Eq
 
 deriving instance
-    Arithmetizable i a
-    => Arithmetizable i (ISO427 a)
+    SymbolicData i a
+    => SymbolicData i (ISO427 a)
 
 newtype Offer a = Offer
     (FiatAccount a, (UInt 64 a, ISO427 a))
     deriving Haskell.Eq
 
 deriving instance
-    ( Arithmetizable i (UInt 64 a)
-    , Arithmetizable i a
-    ) => Arithmetizable i (Offer a)
+    ( SymbolicData i (UInt 64 a)
+    , SymbolicData i a
+    ) => SymbolicData i (Offer a)
 
 newtype FiatTransfer a = FiatTransfer
     (FiatAccount a, Offer a)
     deriving Haskell.Eq
 
 deriving instance
-    ( Arithmetizable a (FiatAccount a)
-    , Arithmetizable a (Offer a)
-    ) => Arithmetizable a (FiatTransfer a)
+    ( SymbolicData i (FiatAccount a)
+    , SymbolicData i (Offer a)
+    ) => SymbolicData i (FiatTransfer a)
 
 newtype MatchedOffer a = MatchedOffer
     (Address a, FiatTransfer a, ByteString 256 a)
     deriving Haskell.Eq
 
 deriving instance
-    ( Arithmetizable a (UInt 64 a)
-    , Arithmetizable a (ByteString 4 a)
-    , Arithmetizable a (ByteString 224 a)
-    , Arithmetizable a (ByteString 256 a)
-    , Arithmetizable a a
-    ) => Arithmetizable a (MatchedOffer a)
+    ( SymbolicData i (UInt 64 a)
+    , SymbolicData i (ByteString 4 a)
+    , SymbolicData i (ByteString 224 a)
+    , SymbolicData i (ByteString 256 a)
+    , SymbolicData i (Address a)
+    , SymbolicData i a
+    ) => SymbolicData i (MatchedOffer a)
 
 hashMatchedOffer :: MatchedOffer a -> ByteString 256 a
 hashMatchedOffer = undefined
