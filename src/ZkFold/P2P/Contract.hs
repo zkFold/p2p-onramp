@@ -4,7 +4,6 @@
 module ZkFold.P2P.Contract where
 
 import           Data.Maybe                                (fromJust)
-import           GHC.Natural                               (Natural)
 import           Prelude                                   hiding (Bool,
                                                             Eq ((==)), any,
                                                             divMod, elem,
@@ -14,17 +13,17 @@ import           Prelude                                   hiding (Bool,
 
 import qualified Prelude                                   as Haskell
 
+import           ZkFold.Base.Data.Vector                   (Vector (..))
 import           ZkFold.Base.Algebra.Basic.Class           (AdditiveSemigroup (..),
-                                                            BinaryExpansion (..),
-                                                            FromConstant (..))
+                                                            BinaryExpansion (..))
 import           ZkFold.Base.Algebra.EllipticCurve.Class
 import           ZkFold.Base.Algebra.EllipticCurve.Ed25519
 import           ZkFold.Symbolic.Algorithms.Hash.SHA2      (SHA2, sha2)
 import           ZkFold.Symbolic.Cardano.Types             (Address (..),
-                                                            Input (..),
                                                             Output (..),
                                                             Transaction (..),
-                                                            txInputs, txOutputs,
+                                                            Value (..),
+                                                            txInputs, txOutputs, txiOutput,
                                                             txoDatumHash)
 import           ZkFold.Symbolic.Compiler                  (SymbolicData)
 import           ZkFold.Symbolic.Data.Bool                 (Bool (..),
@@ -39,7 +38,6 @@ import           ZkFold.Symbolic.Data.Ed25519              ()
 import           ZkFold.Symbolic.Data.Eq                   (Eq (..))
 import           ZkFold.Symbolic.Data.UInt                 (UInt (..))
 import           ZkFold.Symbolic.Types                     (Symbolic)
-
 
 -- Should include part of PAN, account number holder, probably with PCI DSS masking
 -- Can be finished when arithmetizable ByteStrings be ready
@@ -150,6 +148,12 @@ verifyFiatTransferSignature pubkey message (r, s) = (mul s b) == (r + mul hInt p
         b :: Point (Ed25519 a)
         b = gen
 
+txoTokens :: Output tokens datum a -> Value tokens a
+txoTokens (Output (_, (v, _))) = v
+
+emptyValue :: forall n a . Value n a
+emptyValue = Value (Vector @n [])
+
 p2pMatchedOrderContract
     :: forall inputs rinputs outputs tokens a
     .  Symbolic a
@@ -168,15 +172,13 @@ p2pMatchedOrderContract
     => ScalarField (Ed25519 a) ~ UInt 256 a
     => BaseField (Ed25519 a) ~ UInt 256 a
     => Point (Ed25519 a)
-    -> Transaction inputs rinputs  outputs tokens () a
+    -> Transaction inputs rinputs outputs tokens () a
     -> MatchedOffer a
     -> Bool a
 p2pMatchedOrderContract vk tx mo@(MatchedOffer (addr, transfer, signature)) =
-    let h                  = hashMatchedOffer mo
-        f = (\o acc -> bool @(Bool a) acc (Just o) (txoDatumHash o == h))
+    let h = hashMatchedOffer mo
+        f o acc = bool @(Bool a) acc (Just o) (txoDatumHash o == h)
         -- TODO: Simplify this using symbolic `find`.
-        v = (\(Output (_, (v', _))) -> v') $ fromJust $ foldr f Nothing $
-            fmap (\(Input (_, o)) -> o) $ txInputs tx
-        -- TODO: Instead of `zero`, it should be the hash of `()`.
-        txo                = Output (addr, (v, fromConstant (0 :: Natural) :: ByteString 256 a)) :: Output tokens () a
+        v = txoDatumHash $ fromJust $ foldr f Nothing $ txiOutput <$> txInputs tx
+        txo = Output (addr, (emptyValue, v :: ByteString 256 a)) :: Output tokens () a
     in any (\o -> txo == o) (txOutputs tx) && verifyFiatTransferSignature vk transfer signature
