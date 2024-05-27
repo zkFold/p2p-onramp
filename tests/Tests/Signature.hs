@@ -38,7 +38,7 @@ import           ZkFold.Symbolic.Data.ByteString             (ByteString,
                                                               Truncate (..))
 import           ZkFold.Symbolic.Data.Combinators            (Extend (..),
                                                               Iso (..))
-import           ZkFold.Symbolic.Data.UInt                   (DivMod (..), UInt)
+import           ZkFold.Symbolic.Data.UInt                   (UInt)
 
 
 deriving instance (Arbitrary a) => Arbitrary (FiatAccount a)
@@ -60,8 +60,6 @@ sign
     .  SHA2 "SHA512" a 2036
     => SHA2 "SHA512" a 1780
     => SHA2N "SHA512" a
-    => AdditiveSemigroup (UInt 512 a)
-    => MultiplicativeSemigroup (UInt 512 a)
     => ShiftBits (ByteString 512 a)
     => Truncate (ByteString 512 a) (ByteString 256 a)
     => BinaryExpansion a
@@ -76,7 +74,7 @@ sign
     => Extend (ByteString 256 a) (ByteString 512 a)
     => Iso (ByteString 256 a) (UInt 256 a)
     => Iso (ByteString 512 a) (UInt 512 a)
-    => DivMod (UInt 512 a)
+    => EuclideanDomain (UInt 512 a)
     => EllipticCurve (Ed25519 a)
     => ScalarField (Ed25519 a) ~ UInt 256 a
     => BaseField (Ed25519 a) ~ UInt 256 a

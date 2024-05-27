@@ -1,5 +1,4 @@
 packages: .
-    ../zkfold-base/zkfold-base.cabal
 
 write-ghc-environment-files: never
 
@@ -8,10 +7,10 @@ benchmarks: true
 
 test-show-details: direct
 
---source-repository-package
---  type: git
---  location: https://github.com/zkFold/zkfold-base.git
---  tag: 9f9a8f5e2806be4741982d4ddbc6a901e2b1d19a
+source-repository-package
+  type: git
+  location: https://github.com/zkFold/zkfold-base.git
+  tag: ce600f40b9677e7d1d538b4e52e5409536312a80 
 optimization: 2
 
 -- repository cardano-haskell-packages
