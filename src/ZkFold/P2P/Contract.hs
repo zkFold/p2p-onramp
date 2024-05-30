@@ -3,7 +3,8 @@
 
 module ZkFold.P2P.Contract where
 
-import           Data.Maybe                                (fromJust)
+import           Data.Monoid                               (First (..))
+import           Data.Function                             ((&))
 import           Prelude                                   hiding (Bool,
                                                             Eq ((==)), any,
                                                             divMod, elem,
@@ -27,7 +28,7 @@ import           ZkFold.Symbolic.Cardano.Types             (Address (..),
                                                             txoDatumHash)
 import           ZkFold.Symbolic.Compiler                  (SymbolicData)
 import           ZkFold.Symbolic.Data.Bool                 (Bool (..),
-                                                            BoolType (..), any)
+                                                            BoolType (..))
 import           ZkFold.Symbolic.Data.ByteString           (ByteString (..),
                                                             ShiftBits (..),
                                                             Truncate (..))
@@ -148,18 +149,10 @@ verifyFiatTransferSignature pubkey message (r, s) = (mul s b) == (r + mul hInt p
         b :: Point (Ed25519 a)
         b = gen
 
-txoTokens :: Output tokens datum a -> Value tokens a
-txoTokens (Output (_, (v, _))) = v
-
-emptyValue :: forall n a . Value n a
-emptyValue = Value (Vector @n [])
-
-p2pMatchedOrderContract
-    :: forall inputs rinputs outputs tokens a
+verifyFiatTransferSignature'
+    :: forall a
     .  Symbolic a
     => Eq (Bool a) (Point (Ed25519 a))
-    => Eq (Bool a) (Output tokens () a)
-    => Eq (Bool a) (ByteString 256 a)
     => Iso (UInt 256 a) (ByteString 256 a)
     => Extend (ByteString 1524 a) (ByteString 2036 a)
     => Extend (ByteString 256 a) (ByteString 2036 a)
@@ -168,17 +161,55 @@ p2pMatchedOrderContract
     => Truncate (ByteString 512 a) (ByteString 256 a)
     => SHA2 "SHA512" a 2036
     => EllipticCurve (Ed25519 a)
-    => Conditional (Bool a) (Maybe (Output tokens () a))
+    => ScalarField (Ed25519 a) ~ UInt 256 a
+    => BaseField (Ed25519 a) ~ UInt 256 a
+    => Conditional (Bool a) (Maybe (Point (Ed25519 a)))
+    => Point (Ed25519 a)
+    -> FiatTransfer a
+    -> (Point (Ed25519 a), UInt 256 a)
+    -> Maybe (Point (Ed25519 a))
+verifyFiatTransferSignature' p m (r, s) =
+    verifyFiatTransferSignature p m (r, s)
+        & bool @(Bool a) Nothing (Just p)
+
+findOfferInTransaction :: forall a inputs rinputs outputs .
+    Haskell.Eq a =>
+    Eq (Bool a) (Output 0 () a) =>
+    Conditional (Bool a) (Maybe (Output 0 () a)) =>
+    Transaction inputs rinputs outputs 0 () a -> MatchedOffer a -> Maybe (Output 0 () a)
+findOfferInTransaction tx mo@(MatchedOffer (addr, _, _)) =
+    find (txiOutput <$> txInputs tx) ((== hashMatchedOffer mo) . txoDatumHash)
+        >>= find (txOutputs tx) . (==) . Output . (addr, ). (Value $ Vector @0 [],) . txoDatumHash
+
+find :: forall a t tt .
+    Foldable tt =>
+    Conditional (Bool a) (Maybe (t a)) =>
+    tt (t a) -> (t a -> Bool a) -> Maybe (t a)
+find xs p = getFirst $ foldMap (\x -> First (p x & bool @(Bool a) (Just x) Nothing)) xs
+
+p2pMatchedOrderContract
+    :: forall inputs rinputs outputs a
+    .  Symbolic a
+    => Haskell.Eq a
+    => Eq (Bool a) (Point (Ed25519 a))
+    => Eq (Bool a) (Output 0 () a)
+    => Iso (UInt 256 a) (ByteString 256 a)
+    => Extend (ByteString 1524 a) (ByteString 2036 a)
+    => Extend (ByteString 256 a) (ByteString 2036 a)
+    => BoolType (ByteString 2036 a)
+    => ShiftBits (ByteString 2036 a)
+    => Truncate (ByteString 512 a) (ByteString 256 a)
+    => SHA2 "SHA512" a 2036
+    => EllipticCurve (Ed25519 a)
+    => Conditional (Bool a) (Maybe (Output 0 () a))
+    => Conditional (Bool a) (Maybe (Point (Ed25519 a)))
     => ScalarField (Ed25519 a) ~ UInt 256 a
     => BaseField (Ed25519 a) ~ UInt 256 a
     => Point (Ed25519 a)
-    -> Transaction inputs rinputs outputs tokens () a
+    -> Transaction inputs rinputs outputs 0 () a
     -> MatchedOffer a
     -> Bool a
-p2pMatchedOrderContract vk tx mo@(MatchedOffer (addr, transfer, signature)) =
-    let h = hashMatchedOffer mo
-        f o acc = bool @(Bool a) acc (Just o) (txoDatumHash o == h)
-        -- TODO: Simplify this using symbolic `find`.
-        v = txoDatumHash $ fromJust $ foldr f Nothing $ txiOutput <$> txInputs tx
-        txo = Output (addr, (emptyValue, v :: ByteString 256 a)) :: Output tokens () a
-    in any (\o -> txo == o) (txOutputs tx) && verifyFiatTransferSignature vk transfer signature
+p2pMatchedOrderContract vk tx mo@(MatchedOffer (_, trnsfr, sgntr)) =
+    maybe false (const true) $ (,)
+        <$> verifyFiatTransferSignature' vk trnsfr sgntr
+        <*> findOfferInTransaction tx mo
