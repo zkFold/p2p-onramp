@@ -3,8 +3,10 @@
 
 module ZkFold.P2P.Contract where
 
+import           GHC.Natural                               (Natural)
 import           Data.Monoid                               (First (..))
 import           Data.Function                             ((&))
+import           Data.Functor                              ((<&>))
 import           Prelude                                   hiding (Bool,
                                                             Eq ((==)), any,
                                                             divMod, elem,
@@ -14,9 +16,9 @@ import           Prelude                                   hiding (Bool,
 
 import qualified Prelude                                   as Haskell
 
-import           ZkFold.Base.Data.Vector                   (Vector (..))
 import           ZkFold.Base.Algebra.Basic.Class           (AdditiveSemigroup (..),
-                                                            BinaryExpansion (..))
+                                                            BinaryExpansion (..),
+                                                            FromConstant (..))
 import           ZkFold.Base.Algebra.EllipticCurve.Class
 import           ZkFold.Base.Algebra.EllipticCurve.Ed25519
 import           ZkFold.Symbolic.Algorithms.Hash.SHA2      (SHA2, sha2)
@@ -172,15 +174,21 @@ verifyFiatTransferSignature' p m (r, s) =
     verifyFiatTransferSignature p m (r, s)
         & bool @(Bool a) Nothing (Just p)
 
-findOfferInTransaction :: forall a inputs rinputs outputs .
+transactionHasMatchedOffer :: forall a inputs rinputs outputs .
     Haskell.Eq a =>
     Eq (Bool a) (Output 0 () a) =>
+    FromConstant Natural a =>
     Conditional (Bool a) (Maybe (Output 0 () a)) =>
     Transaction inputs rinputs outputs 0 () a -> MatchedOffer a -> Maybe (Output 0 () a)
-findOfferInTransaction tx mo@(MatchedOffer (addr, _, _)) =
-    find (txiOutput <$> txInputs tx) ((== hashMatchedOffer mo) . txoDatumHash)
-        >>= find (txOutputs tx) . (==) . Output . (addr, ). (Value $ Vector @0 [],) . txoDatumHash
+transactionHasMatchedOffer tx mo@(MatchedOffer (addr, _, _)) =
+    do find (txInputs tx <&> txiOutput) $ (== hashMatchedOffer mo) . txoDatumHash
+   >>= find (txOutputs tx) . (==) . Output . (addr, ). (, fromConstant 0) . txoTokens
 
+-- TODO: move it to `zkfold-base`
+txoTokens :: Output tokens datum a -> Value tokens a
+txoTokens (Output (_, (v, _))) = v
+
+-- TODO: move it to `zkfold-base`
 find :: forall a t tt .
     Foldable tt =>
     Conditional (Bool a) (Maybe (t a)) =>
@@ -212,4 +220,4 @@ p2pMatchedOrderContract
 p2pMatchedOrderContract vk tx mo@(MatchedOffer (_, trnsfr, sgntr)) =
     maybe false (const true) $ (,)
         <$> verifyFiatTransferSignature' vk trnsfr sgntr
-        <*> findOfferInTransaction tx mo
+        <*> transactionHasMatchedOffer tx mo
