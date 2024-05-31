@@ -50,15 +50,16 @@ newtype FiatAccount a = FiatAccount a
 deriving instance
     SymbolicData i a => SymbolicData i (FiatAccount a)
 
-newtype ISO427 a = ISO427 (a, (a, a))
+-- According to ISO4217 RFC
+newtype CurrencyCode a = CurrencyCode (a, (a, a))
     deriving Haskell.Eq
 
 deriving instance
     SymbolicData i a
-    => SymbolicData i (ISO427 a)
+    => SymbolicData i (CurrencyCode a)
 
 newtype Offer a = Offer
-    (FiatAccount a, (UInt 64 a, ISO427 a))
+    (FiatAccount a, (UInt 64 a, CurrencyCode a))
     deriving Haskell.Eq
 
 deriving instance
@@ -99,7 +100,7 @@ hashMatchedOffer = undefined
 -- | TODO: A temporary solution while we don't have a proper serialisation for the types above.
 --
 serialiseTransfer :: forall a. BinaryExpansion a => FiatTransfer a -> ByteString 1524 a
-serialiseTransfer (FiatTransfer (FiatAccount r0, Offer (FiatAccount r1, (UInt rs r2, ISO427 (r3, (r4, r5)))))) =
+serialiseTransfer (FiatTransfer (FiatAccount r0, Offer (FiatAccount r1, (UInt rs r2, CurrencyCode (r3, (r4, r5)))))) =
     ByteString $ concatMap binaryExpansion $ (r0 : r1 : rs) <> [r2, r3, r4, r5]
 
 
