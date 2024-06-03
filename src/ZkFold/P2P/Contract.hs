@@ -152,36 +152,13 @@ verifyFiatTransferSignature pubkey message (r, s) = (mul s b) == (r + mul hInt p
         b :: Point (Ed25519 a)
         b = gen
 
-verifyFiatTransferSignature'
-    :: forall a
-    .  Symbolic a
-    => Eq (Bool a) (Point (Ed25519 a))
-    => Iso (UInt 256 a) (ByteString 256 a)
-    => Extend (ByteString 1524 a) (ByteString 2036 a)
-    => Extend (ByteString 256 a) (ByteString 2036 a)
-    => BoolType (ByteString 2036 a)
-    => ShiftBits (ByteString 2036 a)
-    => Truncate (ByteString 512 a) (ByteString 256 a)
-    => SHA2 "SHA512" a 2036
-    => EllipticCurve (Ed25519 a)
-    => ScalarField (Ed25519 a) ~ UInt 256 a
-    => BaseField (Ed25519 a) ~ UInt 256 a
-    => Conditional (Bool a) (Maybe (Point (Ed25519 a)))
-    => Point (Ed25519 a)
-    -> FiatTransfer a
-    -> (Point (Ed25519 a), UInt 256 a)
-    -> Maybe (Point (Ed25519 a))
-verifyFiatTransferSignature' p m (r, s) =
-    verifyFiatTransferSignature p m (r, s)
-        & bool @(Bool a) Nothing (Just p)
-
 transactionHasMatchedOffer :: forall a inputs rinputs outputs .
     Haskell.Eq a =>
     Eq (Bool a) (Output 0 () a) =>
     FromConstant Natural a =>
     Conditional (Bool a) (Maybe (Output 0 () a)) =>
-    Transaction inputs rinputs outputs 0 () a -> MatchedOffer a -> Maybe (Output 0 () a)
-transactionHasMatchedOffer tx mo@(MatchedOffer (addr, _, _)) =
+    Transaction inputs rinputs outputs 0 () a -> MatchedOffer a -> Bool a
+transactionHasMatchedOffer tx mo@(MatchedOffer (addr, _, _)) = maybe false (const true) $
     do find (txInputs tx <&> txiOutput) $ (== hashMatchedOffer mo) . txoDatumHash
    >>= find (txOutputs tx) . (==) . Output . (addr, ). (, fromConstant 0) . txoTokens
 
@@ -211,7 +188,6 @@ p2pMatchedOrderContract
     => SHA2 "SHA512" a 2036
     => EllipticCurve (Ed25519 a)
     => Conditional (Bool a) (Maybe (Output 0 () a))
-    => Conditional (Bool a) (Maybe (Point (Ed25519 a)))
     => ScalarField (Ed25519 a) ~ UInt 256 a
     => BaseField (Ed25519 a) ~ UInt 256 a
     => Point (Ed25519 a)
@@ -219,6 +195,5 @@ p2pMatchedOrderContract
     -> MatchedOffer a
     -> Bool a
 p2pMatchedOrderContract vk tx mo@(MatchedOffer (_, trnsfr, sgntr)) =
-    maybe false (const true) $ (,)
-        <$> verifyFiatTransferSignature' vk trnsfr sgntr
-        <*> transactionHasMatchedOffer tx mo
+     verifyFiatTransferSignature vk trnsfr sgntr
+  && transactionHasMatchedOffer tx mo
