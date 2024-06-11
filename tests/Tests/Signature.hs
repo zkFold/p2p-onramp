@@ -25,7 +25,7 @@ import           ZkFold.Base.Algebra.EllipticCurve.Class
 import           ZkFold.Base.Algebra.EllipticCurve.Ed25519
 import           ZkFold.P2P.Contract                         (FiatAccount (..),
                                                               FiatTransfer (..),
-                                                              ISO427 (..),
+                                                              CurrencyCode (..),
                                                               Offer (..),
                                                               serialiseTransfer,
                                                               verifyFiatTransferSignature)
@@ -43,7 +43,7 @@ import           ZkFold.Symbolic.Data.UInt                   (UInt)
 
 deriving instance (Arbitrary a) => Arbitrary (FiatAccount a)
 deriving instance (FromConstant Natural a, Finite a, AdditiveMonoid a, Arbitrary a) => Arbitrary (Offer a)
-deriving instance (Arbitrary a) => Arbitrary (ISO427 a)
+deriving instance (Arbitrary a) => Arbitrary (CurrencyCode a)
 deriving instance (FromConstant Natural a, Finite a, AdditiveMonoid a, Arbitrary a) => Arbitrary (FiatTransfer a)
 instance (AdditiveMonoid a, Finite a, FromConstant Natural a, Arbitrary a) => Arbitrary (UInt 64 a) where
     arbitrary = fromConstant <$> toss (2 ^ (64 :: Natural))

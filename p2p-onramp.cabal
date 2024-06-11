@@ -33,7 +33,6 @@ common options
       -Wredundant-constraints
       -O2
       -threaded
-      -rtsopts
     if flag(pedantic)
       ghc-options:
         -Werror
@@ -88,6 +87,7 @@ library
 
 executable p2p-onramp-app
     import: options
+    ghc-options: -rtsopts
     main-is:          Main.hs
     build-depends:
         base
