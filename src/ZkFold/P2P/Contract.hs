@@ -97,6 +97,8 @@ deriving instance
     , SymbolicData i a
     ) => SymbolicData i (MatchedOffer a)
 
+type Tokens = 1
+
 hashMatchedOffer :: MatchedOffer a -> ByteString 256 a
 hashMatchedOffer = undefined
 
@@ -159,11 +161,11 @@ transactionHasMatchedOffer :: forall a inputs rinputs outputs .
     Haskell.Eq a =>
     Conditional (Bool a) (Bool a) =>
     DiscreteField (Bool a) a =>
-    AdditiveMonoid (Output 0 () a) =>
-    Eq (Bool a) (Output 0 () a) =>
+    AdditiveMonoid (Output Tokens () a) =>
+    Eq (Bool a) (Output Tokens () a) =>
     Concat (ByteString 8 a) (ByteString 256 a) =>
-    Conditional (Bool a) (Maybe (Output 0 ()) a) =>
-    Transaction inputs rinputs outputs 0 () a -> MatchedOffer a -> Bool a
+    Conditional (Bool a) (Maybe (Output Tokens ()) a) =>
+    Transaction inputs rinputs outputs Tokens () a -> MatchedOffer a -> Bool a
 transactionHasMatchedOffer tx mo@(MatchedOffer (addr, _, _)) =
     find ((== hashMatchedOffer mo) . txoDatumHash) (txInputs tx <&> txiOutput)
         & maybe false (\o -> maybe false (const true)
@@ -180,24 +182,24 @@ p2pMatchedOrderContract
     .  Symbolic a
     => Haskell.Eq a
     => Eq (Bool a) (Point (Ed25519 a))
-    => Eq (Bool a) (Output 0 () a)
+    => Eq (Bool a) (Output Tokens () a)
     => DiscreteField (Bool a) a
     => Iso (UInt 256 a) (ByteString 256 a)
     => Extend (ByteString 1524 a) (ByteString 2036 a)
     => Extend (ByteString 256 a) (ByteString 2036 a)
     => BoolType (ByteString 2036 a)
-    => AdditiveMonoid (Output 0 () a)
+    => AdditiveMonoid (Output Tokens () a)
     => ShiftBits (ByteString 2036 a)
     => Truncate (ByteString 512 a) (ByteString 256 a)
     => Concat (ByteString 8 a) (ByteString 256 a)
     => SHA2 "SHA512" a 2036
     => EllipticCurve (Ed25519 a)
-    => Conditional (Bool a) (Maybe (Output 0 ()) a)
+    => Conditional (Bool a) (Maybe (Output Tokens ()) a)
     => Conditional (Bool a) (Bool a)
     => ScalarField (Ed25519 a) ~ UInt 256 a
     => BaseField (Ed25519 a) ~ UInt 256 a
     => Point (Ed25519 a)
-    -> Transaction inputs rinputs outputs 0 () a
+    -> Transaction inputs rinputs outputs Tokens () a
     -> MatchedOffer a
     -> Bool a
 p2pMatchedOrderContract vk tx mo@(MatchedOffer (_, trnsfr, sgntr)) =
