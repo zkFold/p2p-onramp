@@ -1,15 +1,15 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE OverloadedStrings    #-}
 
 module ZkFold.P2P.Contract where
 
 import           GHC.Natural                               (Natural)
-import           Data.Monoid                               (First (..))
 import           Data.Function                             ((&))
 import           Data.Functor                              ((<&>))
-import           Prelude                                   hiding (Bool,
+import           Prelude                                   hiding (Bool, Maybe,
                                                             Eq ((==)), any,
-                                                            divMod, elem,
+                                                            divMod, elem, maybe,
                                                             length, splitAt,
                                                             truncate, (&&), (*),
                                                             (+), (||))
@@ -18,6 +18,7 @@ import qualified Prelude                                   as Haskell
 
 import           ZkFold.Base.Algebra.Basic.Class           (AdditiveSemigroup (..),
                                                             BinaryExpansion (..),
+                                                            AdditiveMonoid (..),
                                                             FromConstant (..))
 import           ZkFold.Base.Algebra.EllipticCurve.Class
 import           ZkFold.Base.Algebra.EllipticCurve.Ed25519
@@ -25,20 +26,22 @@ import           ZkFold.Symbolic.Algorithms.Hash.SHA2      (SHA2, sha2)
 import           ZkFold.Symbolic.Cardano.Types             (Address (..),
                                                             Output (..),
                                                             Transaction (..),
-                                                            Value (..),
                                                             txInputs, txOutputs, txiOutput,
-                                                            txoDatumHash)
+                                                            txoDatumHash, txoTokens)
 import           ZkFold.Symbolic.Compiler                  (SymbolicData)
 import           ZkFold.Symbolic.Data.Bool                 (Bool (..),
                                                             BoolType (..))
+import           ZkFold.Symbolic.Data.Maybe                (Maybe, find, maybe)
 import           ZkFold.Symbolic.Data.ByteString           (ByteString (..),
                                                             ShiftBits (..),
-                                                            Truncate (..))
+                                                            Truncate (..),
+                                                            Concat (..))
 import           ZkFold.Symbolic.Data.Combinators          (Extend (..),
                                                             Iso (..))
 import           ZkFold.Symbolic.Data.Conditional          (Conditional (..))
 import           ZkFold.Symbolic.Data.Ed25519              ()
 import           ZkFold.Symbolic.Data.Eq                   (Eq (..))
+import           ZkFold.Symbolic.Data.DiscreteField        (DiscreteField (..))
 import           ZkFold.Symbolic.Data.UInt                 (UInt (..))
 import           ZkFold.Symbolic.Types                     (Symbolic)
 
@@ -154,24 +157,23 @@ verifyFiatTransferSignature pubkey message (r, s) = (mul s b) == (r + mul hInt p
 
 transactionHasMatchedOffer :: forall a inputs rinputs outputs .
     Haskell.Eq a =>
+    Conditional (Bool a) (Bool a) =>
+    DiscreteField (Bool a) a =>
+    AdditiveMonoid (Output 0 () a) =>
     Eq (Bool a) (Output 0 () a) =>
-    FromConstant Natural a =>
-    Conditional (Bool a) (Maybe (Output 0 () a)) =>
+    Concat (ByteString 8 a) (ByteString 256 a) =>
+    Conditional (Bool a) (Maybe (Output 0 ()) a) =>
     Transaction inputs rinputs outputs 0 () a -> MatchedOffer a -> Bool a
-transactionHasMatchedOffer tx mo@(MatchedOffer (addr, _, _)) = maybe false (const true) $
-    do find (txInputs tx <&> txiOutput) $ (== hashMatchedOffer mo) . txoDatumHash
-   >>= find (txOutputs tx) . (==) . Output . (addr, ). (, fromConstant 0) . txoTokens
+transactionHasMatchedOffer tx mo@(MatchedOffer (addr, _, _)) =
+    find ((== hashMatchedOffer mo) . txoDatumHash) (txInputs tx <&> txiOutput)
+        & maybe false (\o -> maybe false (const true)
+            $ find ((==) . Output . (addr, ) . (, hashedUnitDatum) $ txoTokens o) (txOutputs tx))
 
--- TODO: move it to `zkfold-base`
-txoTokens :: Output tokens datum a -> Value tokens a
-txoTokens (Output (_, (v, _))) = v
-
--- TODO: move it to `zkfold-base`
-find :: forall a t tt .
-    Foldable tt =>
-    Conditional (Bool a) (Maybe (t a)) =>
-    tt (t a) -> (t a -> Bool a) -> Maybe (t a)
-find xs p = getFirst $ foldMap (\x -> First (p x & bool @(Bool a) (Just x) Nothing)) xs
+hashedUnitDatum ::
+    FromConstant Natural a =>
+    Concat (ByteString 8 a) (ByteString 256 a) =>
+    ByteString 256 a
+hashedUnitDatum = "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"
 
 p2pMatchedOrderContract
     :: forall inputs rinputs outputs a
@@ -179,15 +181,19 @@ p2pMatchedOrderContract
     => Haskell.Eq a
     => Eq (Bool a) (Point (Ed25519 a))
     => Eq (Bool a) (Output 0 () a)
+    => DiscreteField (Bool a) a
     => Iso (UInt 256 a) (ByteString 256 a)
     => Extend (ByteString 1524 a) (ByteString 2036 a)
     => Extend (ByteString 256 a) (ByteString 2036 a)
     => BoolType (ByteString 2036 a)
+    => AdditiveMonoid (Output 0 () a)
     => ShiftBits (ByteString 2036 a)
     => Truncate (ByteString 512 a) (ByteString 256 a)
+    => Concat (ByteString 8 a) (ByteString 256 a)
     => SHA2 "SHA512" a 2036
     => EllipticCurve (Ed25519 a)
-    => Conditional (Bool a) (Maybe (Output 0 () a))
+    => Conditional (Bool a) (Maybe (Output 0 ()) a)
+    => Conditional (Bool a) (Bool a)
     => ScalarField (Ed25519 a) ~ UInt 256 a
     => BaseField (Ed25519 a) ~ UInt 256 a
     => Point (Ed25519 a)
