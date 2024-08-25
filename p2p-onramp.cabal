@@ -78,7 +78,7 @@ common options
 library
     import: options
     exposed-modules:
-        ZkFold.P2P.Contract
+        ZkFold.OnRamp.Contract
     build-depends:
         base                          >= 4.9 && < 5,
         mtl                                        ,

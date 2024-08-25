@@ -4,3 +4,5 @@ cradle:
       component: "lib:p2p-onramp"
     - path: "./app"
       component: "p2p-onramp:exe:p2p-onramp-app"
+    - path: "./tests"
+      component: "p2p-onramp:test:p2p-onramp-test"
