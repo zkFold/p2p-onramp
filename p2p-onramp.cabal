@@ -4,7 +4,7 @@ name:               p2p-onramp
 version:            0.1.0.0
 synopsis:           ZkFold's P2P on-ramp application
 homepage:           zkfold.io
-author:             Vladimir Sinyakov, Pavel Sokolov, Murat Kasimov, Vladimir Morozov
+author:             Vladimir Sinyakov, Pavel Sokolov, Vladimir Morozov, Antonio Hernandez, Murat Kasimov
 maintainer:         info@zkfold.io
 extra-source-files: CHANGELOG.md
 license-file:       LICENSE
@@ -47,6 +47,7 @@ common options
       DeriveFunctor,
       DeriveGeneric,
       DeriveTraversable,
+      DerivingStrategies,
       ExistentialQuantification,
       FlexibleContexts,
       FlexibleInstances,
@@ -78,11 +79,15 @@ common options
 library
     import: options
     exposed-modules:
-        ZkFold.OnRamp.Contract
+      ZkFold.Cardano.UPLC.OnRamp
+      ZkFold.OnRamp.Contract  
     build-depends:
-        base                          >= 4.9 && < 5,
-        mtl                                        ,
-        zkfold-base
+      base                          >= 4.9 && < 5,
+      mtl                                        ,
+      plutus-ledger-api                          ,
+      plutus-tx                                  ,
+      zkfold-base                                ,
+      zkfold-cardano                             ,
     hs-source-dirs: src
 
 executable p2p-onramp-app
