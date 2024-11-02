@@ -80,7 +80,6 @@ library
     import: options
     exposed-modules:
       ZkFold.Cardano.UPLC.OnRamp
-      ZkFold.OnRamp.Contract  
     build-depends:
       base                          >= 4.9 && < 5,
       mtl                                        ,
@@ -104,7 +103,6 @@ test-suite p2p-onramp-test
     ghc-options: -rtsopts
     main-is: Main.hs
     other-modules:
-      Tests.Signature
     build-depends:
       base                          >= 4.9 && < 5,
       hspec                                < 2.12,
