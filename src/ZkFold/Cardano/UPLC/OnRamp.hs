@@ -76,7 +76,7 @@ onRamp _ (Update sig) ctx =
     && isJust (timelock dat')
 
     -- Check the seller's signature
-    && verifyEd25519Signature (getPubKeyHash $ sellerPubKeyHash dat) (dataToBlake dat) sig
+    && verifyEd25519Signature (getPubKeyHash $ sellerPubKeyHash dat) (dataToBlake dat') sig
 onRamp _ Cancel ctx =
   let
     -- Get the current on-ramp output
