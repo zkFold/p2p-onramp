@@ -7,7 +7,7 @@
 module ZkFold.Cardano.UPLC.OnRamp where
 
 import           GHC.Generics                             (Generic)
-import           PlutusLedgerApi.V1.Interval              (before)
+import           PlutusLedgerApi.V1.Interval              (before, after)
 import           PlutusLedgerApi.V3
 import           PlutusLedgerApi.V3.Contexts              (findOwnInput)
 import           PlutusTx                                 (makeIsDataIndexed)
@@ -65,6 +65,7 @@ onRamp _ (Update sig) ctx =
   in
     -- Check the current on-ramp output
     isNothing (buyerPubKeyHash dat)
+    
 
     -- Check the next on-ramp output
     && addr' == addr
@@ -73,7 +74,8 @@ onRamp _ (Update sig) ctx =
     && sellPriceUsd dat' == sellPriceUsd dat
     && sellerPubKeyHash dat' == sellerPubKeyHash dat
     && isJust (buyerPubKeyHash dat')
-    && isJust (timelock dat')
+    -- The timelock must be in the future
+    && maybe False (\t -> t `after` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat')
 
     -- Check the seller's signature
     && verifyEd25519Signature (getPubKeyHash $ sellerPubKeyHash dat) (dataToBlake dat') sig
@@ -89,8 +91,8 @@ onRamp _ Cancel ctx =
       TxOut a v NoOutputDatum Nothing -> (a, v)
       _ -> traceError "onRamp: missing output"
   in
-    -- The timelock must be in the past
-    maybe False (\t -> t `before` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat)
+    -- The timelock is either not set or must be in the past
+    maybe True (\t -> t `before` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat)
 
     -- The value must be returned to the seller
     && addr' == Address (PubKeyCredential $ sellerPubKeyHash dat) Nothing
