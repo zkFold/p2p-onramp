@@ -56,12 +56,12 @@ onRamp _ (Update sig) ctx =
     -- Get the current on-ramp output
     (addr, val, dat) = case findOwnInput ctx of
       Just (TxInInfo _ (TxOut a v (OutputDatum (Datum d)) Nothing)) -> (a, v, unsafeFromBuiltinData @OnRampDatum d)
-      _ -> traceError "rollup: no input"
+      _ -> traceError "onRamp: missing input"
 
     -- Get the next on-ramp output
     (addr', val', dat') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v (OutputDatum (Datum d)) _ -> (a, v, unsafeFromBuiltinData @OnRampDatum d)
-      _ -> traceError "rollup: no output"
+      _ -> traceError "onRamp: missing output"
   in
     -- Check the current on-ramp output
     isNothing (buyerPubKeyHash dat)
@@ -82,12 +82,12 @@ onRamp _ Cancel ctx =
     -- Get the current on-ramp output
     (val, dat) = case findOwnInput ctx of
       Just (TxInInfo _ (TxOut _ v (OutputDatum (Datum d)) Nothing)) -> (v, unsafeFromBuiltinData @OnRampDatum d)
-      _ -> traceError "rollup: no input"
+      _ -> traceError "onRamp: missing input"
 
     -- Get the payment output
     (addr', val') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v NoOutputDatum Nothing -> (a, v)
-      _ -> traceError "rollup: no output"
+      _ -> traceError "onRamp: missing output"
   in
     -- The timelock must be in the past
     maybe False (\t -> t `before` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat)
@@ -100,17 +100,17 @@ onRamp OnRampParams{..} (Claim sig) ctx =
     -- Get the current on-ramp output
     (val, dat) = case findOwnInput ctx of
       Just (TxInInfo _ (TxOut _ v (OutputDatum (Datum d)) Nothing)) -> (v, unsafeFromBuiltinData @OnRampDatum d)
-      _ -> traceError "rollup: no input"
+      _ -> traceError "onRamp: missing input"
 
     -- Get the payment output
     (addr', val') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v NoOutputDatum Nothing -> (a, v)
-      _ -> traceError "rollup: no output"
+      _ -> traceError "onRamp: missing output"
 
     -- Get the fee output
     (addr'', val'') = case head $ tail $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v NoOutputDatum Nothing -> (a, v)
-      _ -> traceError "rollup: no output"
+      _ -> traceError "onRamp: missing output"
   in
     -- The value must be sent to the buyer
     maybe False (\a -> addr' == Address (PubKeyCredential a) Nothing) (buyerPubKeyHash dat)
