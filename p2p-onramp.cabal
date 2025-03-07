@@ -85,17 +85,47 @@ library
       mtl                                        ,
       plutus-ledger-api                          ,
       plutus-tx                                  ,
-      zkfold-base                                ,
+      symbolic-base                              ,
       zkfold-cardano                             ,
     hs-source-dirs: src
 
-executable p2p-onramp-app
-    import: options
-    ghc-options: -rtsopts
-    main-is:          Main.hs
-    build-depends:
-        base
-    hs-source-dirs:   app
+executable p2p-init-transaction
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  other-modules:    P2P.UPLC
+  hs-source-dirs:   backends/p2p-init-transaction
+  build-depends:
+    base              >= 4.9 && < 5,
+    bytestring                     ,
+    directory                      ,
+    filepath                       ,
+    p2p-onramp                     ,
+    plutus-ledger-api              ,
+    plutus-tx                      ,
+    plutus-tx-plugin               ,
+    random                         ,
+    zkfold-cardano                 ,
+
+executable p2p-consume-transaction
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  other-modules:    P2P.UPLC
+  hs-source-dirs:   backends/p2p-consume-transaction
+  build-depends:
+    base              >= 4.9 && < 5,
+    bytestring                     ,
+    directory                      ,
+    filepath                       ,
+    zkfold-cardano                 ,
+    parsec                         ,
+    p2p-onramp                     ,
+    plutus-ledger-api              ,
+    plutus-tx                      ,
+    zkfold-cardano                 ,
 
 test-suite p2p-onramp-test
     import: options
@@ -108,5 +138,5 @@ test-suite p2p-onramp-test
       hspec                                < 2.12,
       QuickCheck                                 ,
       p2p-onramp                                 ,
-      zkfold-base                                ,
+      symbolic-base                              ,
     hs-source-dirs: tests
