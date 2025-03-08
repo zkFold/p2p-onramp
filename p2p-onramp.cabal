@@ -85,8 +85,9 @@ library
       mtl                                        ,
       plutus-ledger-api                          ,
       plutus-tx                                  ,
+      plutus-tx-plugin                           ,
       symbolic-base                              ,
-      zkfold-cardano                             ,
+      zkfold-cardano
     hs-source-dirs: src
 
 executable p2p-init-transaction
@@ -94,7 +95,6 @@ executable p2p-init-transaction
   default-language: Haskell2010
   ghc-options:      -rtsopts
   main-is:          Main.hs
-  other-modules:    P2P.UPLC
   hs-source-dirs:   backends/p2p-init-transaction
   build-depends:
     base              >= 4.9 && < 5,
@@ -105,27 +105,46 @@ executable p2p-init-transaction
     plutus-ledger-api              ,
     plutus-tx                      ,
     plutus-tx-plugin               ,
-    random                         ,
-    zkfold-cardano                 ,
+    zkfold-cardano
 
-executable p2p-consume-transaction
+executable p2p-add-seller
   import:           options
   default-language: Haskell2010
   ghc-options:      -rtsopts
   main-is:          Main.hs
-  other-modules:    P2P.UPLC
-  hs-source-dirs:   backends/p2p-consume-transaction
+  other-modules:    P2P.Example
+  hs-source-dirs:   backends/p2p-add-seller
   build-depends:
+    aeson                          ,
     base              >= 4.9 && < 5,
     bytestring                     ,
     directory                      ,
     filepath                       ,
-    zkfold-cardano                 ,
     parsec                         ,
     p2p-onramp                     ,
     plutus-ledger-api              ,
     plutus-tx                      ,
-    zkfold-cardano                 ,
+    zkfold-cardano
+
+executable p2p-buy-order
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  hs-source-dirs:   backends/p2p-buy-order
+  build-depends:
+    aeson                          ,
+    base              >= 4.9 && < 5,
+    base16-bytestring              ,
+    bytestring                     ,
+    cryptonite                     ,
+    directory                      ,
+    filepath                       ,
+    memory                         ,
+    p2p-onramp                     ,
+    plutus-ledger-api              ,
+    plutus-tx                      ,
+    zkfold-cardano
 
 test-suite p2p-onramp-test
     import: options

@@ -30,6 +30,20 @@ in1=$(cardano-cli conway query utxo --address $(cat $keypath/alice.addr) --testn
 echo ""
 echo "Initialization..."
 
+#--------------------------------- :create onRamp script: --------------------------------
+
+aliceAddress=$(cat $keypath/alice.addr)
+echo "alice address: $aliceAddress"
+
+cabal run p2p-init-transaction -- $aliceAddress
+
+#------------------------------------- :onRamp setup: ------------------------------------
+
+cardano-cli conway address build \
+    --payment-script-file "$assets/onRamp.plutus" \
+    --out-file "$keypath/onRamp.addr" \
+    --testnet-magic $mN
+
 #-------------------------------- :protocol parameters: ------------------------------
 
 cardano-cli conway query protocol-parameters \
@@ -88,30 +102,21 @@ cardano-cli conway address build \
 
 charlieAddress=$(cat $keypath/charlie.addr)
 
-#------------------------------- :create scripts: ------------------------------
-
-cabal run p2p-init-transaction
-
-#-------------------------------- :timed setup: --------------------------------
-
-cardano-cli conway address build \
-    --payment-script-file "$assets/timed.plutus" \
-    --out-file "$keypath/timed.addr" \
-    --testnet-magic $mN
-
 #---------------------------- :fund other wallets: -----------------------------
 
-echo ""
 echo "Funding Barbara, Bob, Brandon and Charlie..."
 echo ""
+
+funds1=100000000  # 100 ADA
+funds2=5000000    #   5 ADA
 
 cardano-cli conway transaction build \
     --testnet-magic $mN \
     --tx-in $in1 \
-    --tx-out "$(cat $keypath/barbara.addr) + 100000000" \
-    --tx-out "$(cat $keypath/bob.addr) + 100000000" \
-    --tx-out "$(cat $keypath/brandon.addr) + 100000000" \
-    --tx-out "$(cat $keypath/charlie.addr) + 5000000" \
+    --tx-out "$barbaraAddress + $funds1" \
+    --tx-out "$bobAddress + $funds1" \
+    --tx-out "$brandonAddress + $funds1" \
+    --tx-out "$charlieAddress + $funds2" \
     --change-address $(cat $keypath/alice.addr) \
     --out-file $keypath/funding.txbody
 
@@ -135,44 +140,6 @@ while true; do
     else
 	echo ""
 	echo "Transaction Id: $fundingTx"
-	break
-    fi
-done
-
-#-------------------------------- :fund timed: --------------------------------
-
-echo ""
-echo "Funding timed script"
-echo ""
-
-cardano-cli conway transaction build \
-    --testnet-magic $mN \
-    --tx-in $fundingTx#4 \
-    --tx-out "$(cat $keypath/timed.addr) + 13000000 lovelace" \
-    --tx-out-inline-datum-cbor-file $unitDatum \
-    --change-address $(cat $keypath/alice.addr) \
-    --out-file $keypath/iniTimed.txbody
-
-cardano-cli conway transaction sign \
-    --testnet-magic $mN \
-    --tx-body-file $keypath/iniTimed.txbody \
-    --signing-key-file $keypath/alice.skey \
-    --out-file $keypath/iniTimed.tx
-
-cardano-cli conway transaction submit \
-    --testnet-magic $mN \
-    --tx-file $keypath/iniTimed.tx
-
-iniTimedTx=$(cardano-cli conway transaction txid --tx-file "$keypath/iniTimed.tx")
-iniTimedOut=$iniTimedTx#0
-while true; do
-    txOnChain=$(cardano-cli conway query utxo --address $(cat $keypath/timed.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r --arg key "$iniTimedOut" 'has($key) | tostring')
-    if [ $txOnChain == "false" ]; then
-	echo "Waiting to see 'timed script' initial funding tx onchain..."
-	sleep $pause
-    else
-	echo ""
-	echo "Transaction Id: $iniTimedTx"
 	break
     fi
 done

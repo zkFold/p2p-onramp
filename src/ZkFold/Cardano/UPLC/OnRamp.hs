@@ -10,7 +10,7 @@ import           GHC.Generics                             (Generic)
 import           PlutusLedgerApi.V1.Interval              (before, after)
 import           PlutusLedgerApi.V3
 import           PlutusLedgerApi.V3.Contexts              (findOwnInput)
-import           PlutusTx                                 (makeIsDataIndexed)
+import           PlutusTx                                 (CompiledCode, compile, liftCodeDef, makeIsDataIndexed, makeLift, unsafeApplyCode)
 import           PlutusTx.Prelude                         hiding (toList, (*), (+))
 import           Prelude                                  (Show)
 
@@ -23,6 +23,7 @@ data OnRampParams = OnRampParams
   }
   deriving stock (Generic, Show)
 
+makeLift ''OnRampParams
 makeIsDataIndexed ''OnRampParams [('OnRampParams,0)]
 
 data OnRampDatum = OnRampDatum
@@ -66,7 +67,6 @@ onRamp _ (Update sig) ctx =
     -- Check the current on-ramp output
     isNothing (buyerPubKeyHash dat)
     
-
     -- Check the next on-ramp output
     && addr' == addr
     && val' == val
@@ -134,3 +134,9 @@ untypedOnRamp computation ctx' =
     redeemer = unsafeFromBuiltinData . getRedeemer . scriptContextRedeemer $ ctx
   in
     check $ onRamp computation redeemer ctx
+
+{-# INLINABLE onRampCompiled #-}
+onRampCompiled :: OnRampParams -> CompiledCode (BuiltinData -> BuiltinUnit)
+onRampCompiled computation =
+  $$(compile [|| untypedOnRamp ||])
+  `unsafeApplyCode` liftCodeDef computation
