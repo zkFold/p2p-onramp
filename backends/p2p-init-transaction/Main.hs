@@ -1,15 +1,21 @@
 module Main where
 
-import qualified Data.ByteString                         as BS
-import           PlutusLedgerApi.V1.Value                (lovelaceValue)
-import           PlutusLedgerApi.V3                      as V3
-import           Prelude                                 (Bool (..), Either (..), FilePath, IO, error, putStr, show, ($), (++))
-import           System.Directory                        (createDirectoryIfMissing, getCurrentDirectory)
-import           System.Environment                      (getArgs)
-import           System.FilePath                         (takeFileName, (</>))
+import qualified Data.ByteString               as BS
+import           PlutusLedgerApi.V1.Value      (lovelaceValue)
+import           PlutusLedgerApi.V3            as V3
+import           Prelude                       (Bool (..), Either (..),
+                                                FilePath, IO, error, putStr,
+                                                show, ($), (++))
+import           System.Directory              (createDirectoryIfMissing,
+                                                getCurrentDirectory)
+import           System.Environment            (getArgs)
+import           System.FilePath               (takeFileName, (</>))
 
-import           ZkFold.Cardano.OffChain.Utils           (dataToCBOR, parseAddress, savePlutus)
-import           ZkFold.Cardano.UPLC.OnRamp              (OnRampParams (..), OnRampRedeemer (..), onRampCompiled)
+import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress,
+                                                savePlutus)
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..),
+                                                OnRampRedeemer (..),
+                                                onRampCompiled)
 
 onrampFee :: Lovelace
 onrampFee = Lovelace 15000000

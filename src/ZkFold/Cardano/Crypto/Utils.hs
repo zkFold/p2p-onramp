@@ -1,13 +1,15 @@
 module ZkFold.Cardano.Crypto.Utils where
 
+import           Crypto.Error           (CryptoFailable (..))
+import           Crypto.PubKey.Ed25519
+import           Data.Aeson             (FromJSON, eitherDecode, withObject,
+                                         (.:))
 import qualified Data.Aeson             as Aeson
-import           Data.Aeson             (FromJSON, eitherDecode, withObject, (.:))
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8  as B8
 import qualified Data.ByteString.Lazy   as BL
-import           Crypto.PubKey.Ed25519
-import           Crypto.Error           (CryptoFailable(..))
-import           Prelude                (IO, Either (..), FilePath, String, pure, ($), (<$>), (-), (>=))
+import           Prelude                (Either (..), FilePath, IO, String,
+                                         pure, ($), (-), (<$>), (>=))
 
 
 data KeyFile = KeyFile { cborHex :: String }

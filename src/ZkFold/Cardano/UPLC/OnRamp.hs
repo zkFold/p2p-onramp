@@ -6,15 +6,17 @@
 
 module ZkFold.Cardano.UPLC.OnRamp where
 
-import           GHC.Generics                             (Generic)
-import           PlutusLedgerApi.V1.Interval              (before, after)
+import           GHC.Generics                 (Generic)
+import           PlutusLedgerApi.V1.Interval  (after, before)
 import           PlutusLedgerApi.V3
-import           PlutusLedgerApi.V3.Contexts              (findOwnInput)
-import           PlutusTx                                 (CompiledCode, compile, liftCodeDef, makeIsDataIndexed, makeLift, unsafeApplyCode)
-import           PlutusTx.Prelude                         hiding (toList, (*), (+))
-import           Prelude                                  (Show)
+import           PlutusLedgerApi.V3.Contexts  (findOwnInput)
+import           PlutusTx                     (CompiledCode, compile,
+                                               liftCodeDef, makeIsDataIndexed,
+                                               makeLift, unsafeApplyCode)
+import           PlutusTx.Prelude             hiding (toList, (*), (+))
+import           Prelude                      (Show)
 
-import           ZkFold.Cardano.OnChain.Utils             (dataToBlake)
+import           ZkFold.Cardano.OnChain.Utils (dataToBlake)
 
 data OnRampParams = OnRampParams
   { feeAddress          :: Address
@@ -67,7 +69,7 @@ onRamp _ (Update signed sellerPubKey) ctx =
   in
     -- Check the current on-ramp output
     isNothing (buyerPubKeyHash dat)
-    
+
     -- Check the next on-ramp output
     && addr' == addr
     && val' == val
@@ -93,7 +95,7 @@ onRamp _ Cancel ctx =
     -- Get the payment output
     (addr', val') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v NoOutputDatum Nothing -> (a, v)
-      _ -> traceError "onRamp: missing output"
+      _                               -> traceError "onRamp: missing output"
   in
     -- The timelock is either not set or must be in the past
     maybe True (\t -> t `before` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat)
@@ -111,12 +113,12 @@ onRamp OnRampParams{..} (Claim sig) ctx =
     -- Get the payment output
     (addr', val') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v NoOutputDatum Nothing -> (a, v)
-      _ -> traceError "onRamp: missing output"
+      _                               -> traceError "onRamp: missing output"
 
     -- Get the fee output
     (addr'', val'') = case head $ tail $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v NoOutputDatum Nothing -> (a, v)
-      _ -> traceError "onRamp: missing output"
+      _                               -> traceError "onRamp: missing output"
   in
     -- The value must be sent to the buyer
     maybe False (\a -> addr' == Address (PubKeyCredential a) Nothing) (buyerPubKeyHash dat)

@@ -1,27 +1,31 @@
 module Main where
 
-import qualified Data.Aeson                    as Aeson
+import           Crypto.PubKey.Ed25519
 import           Data.Aeson                    (eitherDecode, (.:?))
+import qualified Data.Aeson                    as Aeson
 import           Data.Aeson.Types              (parseEither)
 import qualified Data.ByteArray                as BA
 import qualified Data.ByteString               as BS
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as B8
-import           Crypto.PubKey.Ed25519
-import           Data.Maybe                    (maybe)
+import qualified Data.ByteString.Base16        as B16
+import qualified Data.ByteString.Char8         as B8
 import qualified Data.ByteString.Lazy.Char8    as BL8
+import           Data.Maybe                    (maybe)
 import           PlutusLedgerApi.V3            as V3
-import           PlutusTx.Prelude              (blake2b_224, verifyEd25519Signature)
-import           Prelude                       (IO, Either (..), Maybe (..), String, error, print, putStrLn, return,
-                                                ($), (.), (++), (>>=))
+import           PlutusTx.Prelude              (blake2b_224,
+                                                verifyEd25519Signature)
+import           Prelude                       (Either (..), IO, Maybe (..),
+                                                String, error, print, putStrLn,
+                                                return, ($), (++), (.), (>>=))
 import           System.Directory              (getCurrentDirectory)
 import           System.Environment            (getArgs)
 import           System.FilePath               (takeFileName, (</>))
 
-import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress, parseInlineDatum)
-import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..), OnRampRedeemer (..))
+import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress,
+                                                parseInlineDatum)
+import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..),
+                                                OnRampRedeemer (..))
 
 
 parseDatum :: Aeson.Value -> Either String OnRampDatum
