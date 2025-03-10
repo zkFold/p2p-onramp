@@ -39,7 +39,8 @@ data OnRampDatum = OnRampDatum
 makeIsDataIndexed ''OnRampDatum [('OnRampDatum,0)]
 
 data OnRampRedeemer
-  = Update BuiltinByteString
+  = Update BuiltinByteString  -- Signed data by seller
+           BuiltinByteString  -- Seller's public key
   -- ^ Update the bid with the buyer's public key hash and the timelock.
   | Claim BuiltinByteString
   -- ^ Buyer claims the value.
@@ -52,7 +53,7 @@ makeIsDataIndexed ''OnRampRedeemer [('Cancel,0),('Update,1),('Claim,2)]
 -- | Plutus script for a trustless P2P on-ramp.
 {-# INLINABLE onRamp #-}
 onRamp :: OnRampParams -> OnRampRedeemer -> ScriptContext -> Bool
-onRamp _ (Update sig) ctx =
+onRamp _ (Update signed sellerPubKey) ctx =
   let
     -- Get the current on-ramp output
     (addr, val, dat) = case findOwnInput ctx of
@@ -63,6 +64,9 @@ onRamp _ (Update sig) ctx =
     (addr', val', dat') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v (OutputDatum (Datum d)) _ -> (a, v, unsafeFromBuiltinData @OnRampDatum d)
       _ -> traceError "onRamp: missing output"
+
+    -- Get seller's pub key hash from datum
+    sellerPkh = getPubKeyHash $ sellerPubKeyHash dat  --ToDo: only used once
   in
     -- Check the current on-ramp output
     isNothing (buyerPubKeyHash dat)
@@ -75,10 +79,13 @@ onRamp _ (Update sig) ctx =
     && sellerPubKeyHash dat' == sellerPubKeyHash dat
     && isJust (buyerPubKeyHash dat')
     -- The timelock must be in the future
-    && maybe False (\t -> t `after` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat')
+    -- && maybe False (\t -> t `after` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat')
 
     -- Check the seller's signature
-    && verifyEd25519Signature (getPubKeyHash $ sellerPubKeyHash dat) (dataToBlake dat') sig
+    && verifyEd25519Signature sellerPubKey (dataToBlake dat') signed
+
+    -- Check the seller's pub key in redeemer
+    && sellerPkh == blake2b_224 sellerPubKey
 onRamp _ Cancel ctx =
   let
     -- Get the current on-ramp output

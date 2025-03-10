@@ -59,7 +59,7 @@ echo "Generating buyer's datum and redeemer..."
 
 cabal run p2p-buy-order -- "charlie" "$charlieAddr" "barbara" "$barbaraOutResolved"
 
-exit 1  # ToDo: 'verifyEd25519Signature' needs PubKey, not PubKeyHash.
+# exit 1  # ToDo: 'verifyEd25519Signature' needs PubKey, not PubKeyHash.
 
 echo ""
 echo "Buy-order transaction..."
@@ -91,7 +91,7 @@ cardano-cli conway transaction build \
     cardano-cli conway transaction sign \
 	--testnet-magic $mN \
 	--tx-body-file $keypath/charlieBuys.txbody \
-	--signing-key-file $keypath/charlie.skey \
+	--signing-key-file $keypath/barbara.skey \
 	--out-file $keypath/charlieBuys.tx
 
     cardano-cli conway transaction submit \
