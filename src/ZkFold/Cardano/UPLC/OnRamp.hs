@@ -64,9 +64,6 @@ onRamp _ (Update signed sellerPubKey) ctx =
     (addr', val', dat') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v (OutputDatum (Datum d)) _ -> (a, v, unsafeFromBuiltinData @OnRampDatum d)
       _ -> traceError "onRamp: missing output"
-
-    -- Get seller's pub key hash from datum
-    sellerPkh = getPubKeyHash $ sellerPubKeyHash dat  --ToDo: only used once
   in
     -- Check the current on-ramp output
     isNothing (buyerPubKeyHash dat)
@@ -79,13 +76,13 @@ onRamp _ (Update signed sellerPubKey) ctx =
     && sellerPubKeyHash dat' == sellerPubKeyHash dat
     && isJust (buyerPubKeyHash dat')
     -- The timelock must be in the future
-    -- && maybe False (\t -> t `after` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat')
+    && maybe False (\t -> t `after` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat')
 
     -- Check the seller's signature
     && verifyEd25519Signature sellerPubKey (dataToBlake dat') signed
 
     -- Check the seller's pub key in redeemer
-    && sellerPkh == blake2b_224 sellerPubKey
+    && (getPubKeyHash $ sellerPubKeyHash dat) == blake2b_224 sellerPubKey
 onRamp _ Cancel ctx =
   let
     -- Get the current on-ramp output

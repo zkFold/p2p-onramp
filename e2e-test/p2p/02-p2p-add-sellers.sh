@@ -49,7 +49,7 @@ echo "Adding sellers..."
 sellPrice=$(random_integer 30 40)
 lovelaceSold=$(random_integer 30000000 40000000)
 barbaraAddr=$(cat $keypath/barbara.addr)
-deadline=$(($current_time + 3))  # just adding 3 seconds to current time
+deadline=$(($current_time + 60))  # giving one minute for buyer to decide to buy
 
 echo ""
 echo "Barbara sells $lovelaceSold lovelace..."

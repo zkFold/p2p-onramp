@@ -68,7 +68,7 @@ main = do
 
           let nextDat = prevDat { buyerPubKeyHash = Just buyerPkh }
 
-          let sig            = sign sk vk . fromBuiltin @BuiltinByteString $ dataToBlake nextDat
+          let sig            = sign sk vk . fromBuiltin $ dataToBlake nextDat
               updateRedeemer = Update
                                ( toBuiltin @BS.ByteString . BA.convert $ sig )
                                ( toBuiltin @BS.ByteString . BA.convert $ vk )
