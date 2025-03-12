@@ -1,20 +1,22 @@
-{-# LANGUAGE DeriveAnyClass  #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module ZkFold.Cardano.Parse.Utils where
 
-import           Data.Aeson                 (FromJSON, eitherDecode)
-import qualified Data.Aeson                 as Aeson
-import qualified Data.ByteString.Lazy.Char8 as BL8
+import           Data.Aeson                    (FromJSON, eitherDecode)
+import qualified Data.Aeson                    as Aeson
+import qualified Data.ByteString.Lazy.Char8    as BL8
 import           Data.Coerce
-import           Data.Maybe                 (maybe)
-import           GHC.Generics               (Generic)
-import           PlutusLedgerApi.V3         as V3
-import           Prelude                    (Either (..), Integer, Maybe (..), String, either, fail, pure, show,
-                                             ($), (<$>), (.))
-import           Text.Parsec                (parse)
+import           Data.Maybe                    (maybe)
+import           GHC.Generics                  (Generic)
+import           PlutusLedgerApi.V3            as V3
+import           Prelude                       (Either (..), Integer,
+                                                Maybe (..), String, either,
+                                                fail, pure, show, ($), (.),
+                                                (<$>))
+import           Text.Parsec                   (parse)
 
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
 import           ZkFold.Cardano.OffChain.Utils (integerParser, parseInlineDatum)
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
 
 ----- PARSE 'OnRampDatum' -----
 

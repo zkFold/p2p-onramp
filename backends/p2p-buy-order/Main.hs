@@ -8,8 +8,9 @@ import qualified Data.ByteString.Char8         as B8
 import           PlutusLedgerApi.V3            as V3
 import           PlutusTx.Prelude              (blake2b_224,
                                                 verifyEd25519Signature)
-import           Prelude                       (Either (..), IO, Maybe (..), error, print, putStrLn, return,
-                                                ($), (++), (.)) 
+import           Prelude                       (Either (..), IO, Maybe (..),
+                                                error, print, putStrLn, return,
+                                                ($), (++), (.))
 import           System.Directory              (getCurrentDirectory)
 import           System.Environment            (getArgs)
 import           System.FilePath               (takeFileName, (</>))

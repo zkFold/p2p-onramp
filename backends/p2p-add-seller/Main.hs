@@ -4,8 +4,9 @@ import qualified Data.ByteString               as BS
 import           P2P.Example                   (paymentInfoHashEx1)
 import           PlutusLedgerApi.V1.Value      (lovelaceValue)
 import           PlutusLedgerApi.V3            as V3
-import           Prelude                       (Bool (..), Either (..), IO, Integer, Maybe (..),
-                                                error, return, show, ($), (++), (.))
+import           Prelude                       (Bool (..), Either (..), IO,
+                                                Integer, Maybe (..), error,
+                                                return, show, ($), (++), (.))
 import           System.Directory              (createDirectoryIfMissing,
                                                 getCurrentDirectory)
 import           System.Environment            (getArgs)
