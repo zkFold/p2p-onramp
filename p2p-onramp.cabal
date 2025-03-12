@@ -81,6 +81,7 @@ library
     exposed-modules:
       ZkFold.Cardano.UPLC.OnRamp
       ZkFold.Cardano.Crypto.Utils
+      ZkFold.Cardano.Parse.Utils
     build-depends:
       aeson                                      ,
       base                          >= 4.9 && < 5,
@@ -151,16 +152,16 @@ executable p2p-buy-order
     plutus-tx                      ,
     zkfold-cardano
 
--- test-suite p2p-onramp-test
---     import: options
---     type: exitcode-stdio-1.0
---     ghc-options: -rtsopts
---     main-is: Main.hs
---     other-modules:
---     build-depends:
---       base                          >= 4.9 && < 5,
---       hspec                                < 2.12,
---       QuickCheck                                 ,
---       p2p-onramp                                 ,
---       symbolic-base                              ,
---     hs-source-dirs: tests
+test-suite p2p-onramp-test
+    import: options
+    type: exitcode-stdio-1.0
+    ghc-options: -rtsopts
+    main-is: Main.hs
+    other-modules:
+    build-depends:
+      base                          >= 4.9 && < 5,
+      hspec                                < 2.12,
+      QuickCheck                                 ,
+      p2p-onramp                                 ,
+      symbolic-base                              ,
+    hs-source-dirs: tests

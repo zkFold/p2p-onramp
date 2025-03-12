@@ -1,44 +1,27 @@
 module Main where
 
 import           Crypto.PubKey.Ed25519
-import           Data.Aeson                    (eitherDecode, (.:?))
-import qualified Data.Aeson                    as Aeson
-import           Data.Aeson.Types              (parseEither)
 import qualified Data.ByteArray                as BA
 import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Base16        as B16
 import qualified Data.ByteString.Char8         as B8
-import qualified Data.ByteString.Lazy.Char8    as BL8
-import           Data.Maybe                    (maybe)
 import           PlutusLedgerApi.V3            as V3
 import           PlutusTx.Prelude              (blake2b_224,
                                                 verifyEd25519Signature)
-import           Prelude                       (Either (..), IO, Maybe (..),
-                                                String, error, print, putStrLn,
-                                                return, ($), (++), (.), (>>=))
+import           Prelude                       (Either (..), IO, Maybe (..), error, print, putStrLn, return,
+                                                ($), (++), (.)) 
 import           System.Directory              (getCurrentDirectory)
 import           System.Environment            (getArgs)
 import           System.FilePath               (takeFileName, (</>))
 
 import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
-import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress,
-                                                parseInlineDatum)
+import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..),
                                                 OnRampRedeemer (..))
 
+import ZkFold.Cardano.Parse.Utils (parseOnRampDatum)
 
-parseDatum :: Aeson.Value -> Either String OnRampDatum
-parseDatum (Aeson.Object v) = do
-  inlineDatum <- case parseEither (.:? "inlineDatum") v of
-                   Right (Just inlineDatumObject) -> parseInlineDatum inlineDatumObject
-                   Right Nothing                  -> Right Nothing
-                   Left err                       -> Left $ "Failed to parse inlineDatum: " ++ err
-
-  case inlineDatum of
-    Just (OutputDatum dat) -> maybe (Left "Missing datum") Right (fromBuiltinData . getDatum $ dat)
-    _                      -> Left "Missing inlineDatum"
-parseDatum _ = Left "Failed to parse datum"
 
 main :: IO ()
 main = do
@@ -60,10 +43,11 @@ main = do
       let paramsE = do
             sk        <- skE
             buyerAddr <- parseAddress buyerAddrStr
-            prevDat   <- eitherDecode (BL8.pack sellerUtxoStr) >>= parseDatum
             buyerPkh  <- case addressCredential buyerAddr of
                            PubKeyCredential pkh -> Right pkh
                            _                    -> Left "Expected 'PubKeyCredential'"
+            prevDat   <- parseOnRampDatum sellerUtxoStr
+
             return (sk, buyerPkh, prevDat)
 
       case paramsE of
@@ -87,6 +71,6 @@ main = do
           BS.writeFile (assetsPath </> (buyerName ++ "BoughtDatum.cbor")) $ dataToCBOR nextDat
           BS.writeFile (assetsPath </> (sellerName ++ "SoldRedeemer.cbor")) $ dataToCBOR updateRedeemer
 
-        Left e                    -> error e
+        Left e                        -> error e
 
     _ -> error "Please provide four command-line arguments.\n"
