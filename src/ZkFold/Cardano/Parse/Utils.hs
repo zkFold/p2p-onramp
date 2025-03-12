@@ -2,31 +2,49 @@
 
 module ZkFold.Cardano.Parse.Utils where
 
-import           Data.Aeson                 (eitherDecode, (.:?))
+import           Data.Aeson                 (FromJSON, eitherDecode)
 import qualified Data.Aeson                 as Aeson
-import           Data.Aeson.Types           (parseEither)
 import qualified Data.ByteString.Lazy.Char8 as BL8
+import           Data.Coerce
 import           Data.Maybe                 (maybe)
+import           GHC.Generics               (Generic)
 import           PlutusLedgerApi.V3         as V3
-import           Prelude                    (Either (..), Maybe (..), String,
-                                             ($), (.), (++), (>>=))
+import           Prelude                    (Either (..), Integer, Maybe (..), String, either, fail, pure, show,
+                                             ($), (<$>), (.))
+import           Text.Parsec                (parse)
 
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
-import           ZkFold.Cardano.OffChain.Utils (parseInlineDatum)
+import           ZkFold.Cardano.OffChain.Utils (integerParser, parseInlineDatum)
 
+----- PARSE 'OnRampDatum' -----
 
-parseOnRampDatumJSON :: Aeson.Value -> Either String OnRampDatum
-parseOnRampDatumJSON (Aeson.Object v) = do
-  inlineDatum <- case parseEither (.:? "inlineDatum") v of
-                   Right (Just inlineDatumObject) -> parseInlineDatum inlineDatumObject
-                   Right Nothing                  -> Left "Missing inline datum"
-                   Left err                       -> Left $ "Failed to parse inlineDatum: " ++ err
+newtype OnRampDatumJSON = OnRampDatumJSON OnRampDatum
+
+parseOnRampDatumJSON :: Aeson.Value -> Either String OnRampDatumJSON
+parseOnRampDatumJSON v = do
+  inlineDatum <- parseInlineDatum v
 
   case inlineDatum of
-    Just (OutputDatum dat) -> maybe (Left "Missing datum") Right (fromBuiltinData . getDatum $ dat)
+    Just (OutputDatum dat) -> maybe (Left "Missing datum") Right
+                                (OnRampDatumJSON <$> (fromBuiltinData . getDatum $ dat))
     _                      -> Left "Missing output datum"
-parseOnRampDatumJSON _ = Left "Failed to parse datum"
 
--- | Parse 'OnRampDatum' from a string representation of UTxO
+instance FromJSON OnRampDatumJSON where
+  parseJSON v = either fail pure (parseOnRampDatumJSON v)
+
+data OnRampUtxo = OnRampUtxo { address         :: String
+                             , inlineDatum     :: OnRampDatumJSON
+                             , inlineDatumhash :: String
+                             , value           :: Aeson.Value
+                             } deriving stock Generic
+                               deriving anyclass FromJSON
+
+-- | Parsing 'OnRampDatum' from a string representation of 'OnRampUtxo'
 parseOnRampDatum :: String -> Either String OnRampDatum
-parseOnRampDatum utxoStr = eitherDecode (BL8.pack utxoStr) >>= parseOnRampDatumJSON
+parseOnRampDatum utxoStr = coerce . inlineDatum <$> eitherDecode (BL8.pack utxoStr)
+
+
+----- PARSE 'Integer' -----
+
+parseInteger :: String -> Either String Integer
+parseInteger = either (Left . show) Right . parse integerParser ""

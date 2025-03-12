@@ -58,7 +58,7 @@ echo ""
 echo "Generating buyer's datum and redeemer..."
 
 cabal run p2p-buy-order -- "charlie" "$charlieAddr" "barbara" "$barbaraOutResolved"
-
+exit 1
 echo ""
 echo "Buy-order transaction..."
 echo ""

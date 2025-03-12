@@ -4,18 +4,15 @@ import qualified Data.ByteString               as BS
 import           P2P.Example                   (paymentInfoHashEx1)
 import           PlutusLedgerApi.V1.Value      (lovelaceValue)
 import           PlutusLedgerApi.V3            as V3
-import           Prelude                       (Bool (..), Either (..), IO,
-                                                Integer, Maybe (..), String,
-                                                either, error, return, show,
-                                                ($), (++), (.))
+import           Prelude                       (Bool (..), Either (..), IO, Integer, Maybe (..),
+                                                error, return, show, ($), (++), (.))
 import           System.Directory              (createDirectoryIfMissing,
                                                 getCurrentDirectory)
 import           System.Environment            (getArgs)
 import           System.FilePath               (takeFileName, (</>))
-import           Text.Parsec                   (parse)
 
-import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, integerParser,
-                                                parseAddress)
+import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress)
+import           ZkFold.Cardano.Parse.Utils    (parseInteger)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
 
 
@@ -67,9 +64,6 @@ main = do
 
 
 ----- HELPER FUNCTIONS -----
-
-parseInteger :: String -> Either String Integer
-parseInteger = either (Left . show) Right . parse integerParser ""
 
 uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
 uncurry4 f (a, b, c, d) = f a b c d
