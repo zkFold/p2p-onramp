@@ -2,21 +2,28 @@
 
 module ZkFold.Cardano.Parse.Utils where
 
-import           Data.Aeson                    (FromJSON, eitherDecode)
+import           Cardano.Api                   as Api
+import           GHC.IsList                    (toList)
+import           PlutusLedgerApi.V1.Value
+import           Data.Aeson                    (eitherDecode, parseJSON)
 import qualified Data.Aeson                    as Aeson
 import qualified Data.ByteString.Lazy.Char8    as BL8
 import           Data.Coerce
-import           Data.Maybe                    (maybe)
 import           GHC.Generics                  (Generic)
 import           PlutusLedgerApi.V3            as V3
-import           Prelude                       (Either (..), Integer,
-                                                Maybe (..), String, either,
-                                                fail, pure, show, ($), (.),
-                                                (<$>))
+import           Prelude
 import           Text.Parsec                   (parse)
 
 import           ZkFold.Cardano.OffChain.Utils (integerParser, parseInlineDatum)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
+
+
+data OnRampUtxo = OnRampUtxo { address         :: String
+                             , inlineDatum     :: OnRampDatumJSON
+                             , inlineDatumhash :: String
+                             , value           :: ValueJSON
+                             } deriving stock Generic
+                               deriving anyclass FromJSON
 
 ----- PARSE 'OnRampDatum' -----
 
@@ -32,19 +39,36 @@ parseOnRampDatumJSON v = do
     _                      -> Left "Missing output datum"
 
 instance FromJSON OnRampDatumJSON where
-  parseJSON v = either fail pure (parseOnRampDatumJSON v)
-
-data OnRampUtxo = OnRampUtxo { address         :: String
-                             , inlineDatum     :: OnRampDatumJSON
-                             , inlineDatumhash :: String
-                             , value           :: Aeson.Value
-                             } deriving stock Generic
-                               deriving anyclass FromJSON
+  parseJSON = either fail pure . parseOnRampDatumJSON
 
 -- | Parsing 'OnRampDatum' from a string representation of 'OnRampUtxo'
 parseOnRampDatum :: String -> Either String OnRampDatum
 parseOnRampDatum utxoStr = coerce . inlineDatum <$> eitherDecode (BL8.pack utxoStr)
 
+
+----- PARSE 'Value' -----
+
+toPlutusValue :: Api.Value -> V3.Value
+toPlutusValue val =
+    mconcat . map convertAsset $ toList val
+  where
+    convertAsset (AdaAssetId, Quantity q) =
+        singleton adaSymbol adaToken q
+    convertAsset (AssetId policyId assetName, Quantity q) =
+        singleton
+            (CurrencySymbol . toBuiltin . serialiseToRawBytes $ policyId)
+            (TokenName . toBuiltin . serialiseToRawBytes $ assetName)
+            q
+
+newtype ValueJSON = ValueJSON V3.Value
+
+instance FromJSON ValueJSON where
+  parseJSON v = ValueJSON . toPlutusValue <$> parseJSON @Api.Value v
+
+-- | Parsing 'Value' from a string representation of 'OnRampUtxo'
+parseValue :: String -> Either String V3.Value
+parseValue utxoStr = coerce . value <$> eitherDecode (BL8.pack utxoStr)
+  
 
 ----- PARSE 'Integer' -----
 
