@@ -25,13 +25,6 @@ fi
 onRampAddr=$(cat $keypath/onRamp.addr)
 onRampPlutus=$assets/onRamp.plutus
 
-barbaraRedeemer=$assets/barbaraSoldRedeemer.cbor
-barbaraOut=$(cardano-cli conway transaction txid --tx-file "$keypath/barbaraSells.tx")#0
-barbaraOutResolved=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
-                         jq -r --arg key "$barbaraOut" '.[$key]')
-barbaraLovelace=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
-                          jq -r --arg key "$barbaraOut" '.[$key].value.lovelace')
-
 charlieDatum=$assets/charlieBoughtDatum.cbor
 charlieAddr=$(cat $keypath/charlie.addr)
 
@@ -46,18 +39,40 @@ posix_to_slot () {
     echo $(( 10 * ($posix_time - $system_start) ))
 }
 
-random_integer () {
-    local min=$1
-    local max=$2
-    echo $(( RANDOM % (max - min + 1) + min ))
+seller_utxo () {
+    local seller_name=$1
+    local tx_out_ref=$(cardano-cli conway transaction txid --tx-file "$keypath/${seller_name}Sells.tx")#0
+    echo $(cardano-cli conway query utxo --address $onRampAddr --testnet-magic $mN --out-file /dev/stdout |
+               jq -c --arg key "$tx_out_ref" '.[$key]')
 }
+
+#--------------------------- :select best seller: ------------------------------
+
+echo ""
+echo "Choosing best sell offer..."
+echo ""
+
+# Example: selecting best offer among three sellers.
+cabal run p2p-choose-offer  -- "barbara" $(seller_utxo "barbara") \
+                               "bob" $(seller_utxo "bob") \
+                               "brandon" $(seller_utxo "brandon")
+
+seller=$(cat $assets/sellerChoice.txt)
+echo "Selected sell offer: $seller"
+
+sellerRedeemer="$assets/${seller}SoldRedeemer.cbor"
+sellerOut=$(cardano-cli conway transaction txid --tx-file "$keypath/${seller}Sells.tx")#0
+sellerOutResolved=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
+                         jq -r --arg key "$sellerOut" '.[$key]')
+sellerLovelace=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
+                          jq -r --arg key "$sellerOut" '.[$key].value.lovelace')
 
 #-------------------------------- :buy order: ----------------------------------
 
 echo ""
 echo "Generating buyer's datum and redeemer..."
 
-cabal run p2p-buy-order -- "charlie" "$charlieAddr" "barbara" "$barbaraOutResolved"
+cabal run p2p-buy-order -- "charlie" $charlieAddr $seller $(seller_utxo $seller)
 
 echo ""
 echo "Buy-order transaction..."
@@ -75,12 +90,12 @@ slot2=$(($current_slot + 25))
 cardano-cli conway transaction build \
     --testnet-magic $mN \
     --tx-in $in1 \
-    --tx-in $barbaraOut \
+    --tx-in $sellerOut \
     --tx-in-script-file $onRampPlutus \
     --tx-in-inline-datum-present \
-    --tx-in-redeemer-cbor-file $barbaraRedeemer \
+    --tx-in-redeemer-cbor-file $sellerRedeemer \
     --tx-in-collateral $collateral \
-    --tx-out "$onRampAddr + $barbaraLovelace lovelace" \
+    --tx-out "$onRampAddr + $sellerLovelace lovelace" \
     --tx-out-inline-datum-cbor-file $charlieDatum \
     --change-address $(cat $keypath/charlie.addr) \
     --invalid-before $slot1 \

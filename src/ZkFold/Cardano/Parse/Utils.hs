@@ -22,12 +22,13 @@ data OnRampUtxo = OnRampUtxo { address         :: String
                              , inlineDatum     :: OnRampDatumJSON
                              , inlineDatumhash :: String
                              , value           :: ValueJSON
-                             } deriving stock Generic
+                             } deriving stock (Generic, Show)
                                deriving anyclass FromJSON
 
 ----- PARSE 'OnRampDatum' -----
 
 newtype OnRampDatumJSON = OnRampDatumJSON OnRampDatum
+  deriving stock Show
 
 parseOnRampDatumJSON :: Aeson.Value -> Either String OnRampDatumJSON
 parseOnRampDatumJSON v = do
@@ -61,6 +62,7 @@ toPlutusValue val =
             q
 
 newtype ValueJSON = ValueJSON V3.Value
+  deriving stock Show
 
 instance FromJSON ValueJSON where
   parseJSON v = ValueJSON . toPlutusValue <$> parseJSON @Api.Value v

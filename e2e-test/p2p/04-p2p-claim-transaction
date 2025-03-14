@@ -25,8 +25,10 @@ fi
 onRampAddr=$(cat $keypath/onRamp.addr)
 onRampPlutus=$assets/onRamp.plutus
 
+seller=$(cat $assets/sellerChoice.txt)
+
 charlieAddr=$(cat $keypath/charlie.addr)
-charlieRedeemer=$assets/barbaraPaymentInfoRedeemer.cbor  # ToDo: algorithm for Charlie's choice of seller
+charlieRedeemer="$assets/${seller}PaymentInfoRedeemer.cbor"
 charlieOrderOut=$(cardano-cli conway transaction txid --tx-file "$keypath/charlieBuys.tx")#0
 
 feeAddr=$(cat $keypath/alice.addr)

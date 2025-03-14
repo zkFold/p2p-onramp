@@ -37,12 +37,6 @@ posix_to_slot () {
     echo $(( 10 * ($posix_time - $system_start) ))
 }
 
-random_integer () {
-    local min=$1
-    local max=$2
-    echo $(( RANDOM % (max - min + 1) + min ))
-}
-
 #------------------------------- :cancel Barbara: ------------------------------
 
 echo "Cancel sell orders..."

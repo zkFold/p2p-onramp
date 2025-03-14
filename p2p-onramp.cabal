@@ -135,6 +135,22 @@ executable p2p-add-seller
     plutus-tx                      ,
     zkfold-cardano
 
+executable p2p-choose-offer
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  other-modules:    P2P.Example
+  hs-source-dirs:   backends/p2p-choose-offer
+  build-depends:
+    aeson                          ,
+    base              >= 4.9 && < 5,
+    bytestring                     ,
+    directory                      ,
+    filepath                       ,
+    p2p-onramp                     ,
+    plutus-ledger-api              ,
+
 executable p2p-buy-order
   import:           options
   default-language: Haskell2010

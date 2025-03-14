@@ -6,8 +6,7 @@ import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Base16        as B16
 import qualified Data.ByteString.Char8         as B8
 import           PlutusLedgerApi.V3            as V3
-import           PlutusTx.Prelude              (blake2b_224,
-                                                verifyEd25519Signature)
+import           PlutusTx.Prelude              (verifyEd25519Signature)
 import           Prelude                       (Either (..), IO, Maybe (..),
                                                 error, print, putStrLn, return,
                                                 ($), (++), (.))
@@ -62,9 +61,7 @@ main = do
           putStrLn "\nVerifies signature:"
           print $ verifyEd25519Signature (toBuiltin @BS.ByteString . BA.convert $ vk) (dataToBlake nextDat) (toBuiltin @BS.ByteString . BA.convert $ sig)
 
-          putStrLn $ "\nPublic Key: " ++ B8.unpack (B16.encode . BA.convert $ vk)
-          putStrLn $ "PubKeyHash: " ++ B8.unpack (B16.encode . fromBuiltin . blake2b_224 . toBuiltin @BS.ByteString . BA.convert $ vk)
-          putStrLn $ "Signature: " ++ B8.unpack (B16.encode . BA.convert $ sig)
+          putStrLn $ "\nSignature: " ++ B8.unpack (B16.encode . BA.convert $ sig)
 
           BS.writeFile (assetsPath </> (buyerName ++ "BoughtDatum.cbor")) $ dataToCBOR nextDat
           BS.writeFile (assetsPath </> (sellerName ++ "SoldRedeemer.cbor")) $ dataToCBOR updateRedeemer
