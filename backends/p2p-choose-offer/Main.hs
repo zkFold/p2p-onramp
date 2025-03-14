@@ -1,15 +1,15 @@
 module Main where
 
-import           Data.List          (maximumBy)
-import           Data.Ord           (comparing)
-import           P2P.Example        (choiceValue)
+import           Data.List                  (maximumBy)
+import           Data.Ord                   (comparing)
+import           P2P.Example                (choiceValue)
 import           Prelude
-import           System.Directory   (getCurrentDirectory)
-import           System.Environment (getArgs)
-import           System.FilePath    (takeFileName, (</>))
-import qualified System.IO          as IO
+import           System.Directory           (getCurrentDirectory)
+import           System.Environment         (getArgs)
+import           System.FilePath            (takeFileName, (</>))
+import qualified System.IO                  as IO
 
-import ZkFold.Cardano.Parse.Utils   (parseOnRampDatum)
+import           ZkFold.Cardano.Parse.Utils (parseOnRampDatum)
 
 
 main :: IO ()
