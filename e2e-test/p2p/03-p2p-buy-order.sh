@@ -25,6 +25,8 @@ fi
 onRampAddr=$(cat $keypath/onRamp.addr)
 onRampPlutus=$assets/onRamp.plutus
 
+sellerNamesAll=("barbara" "bob" "brandon")
+
 charlieDatum=$assets/charlieBoughtDatum.cbor
 charlieAddr=$(cat $keypath/charlie.addr)
 
@@ -39,11 +41,36 @@ posix_to_slot () {
     echo $(( 10 * ($posix_time - $system_start) ))
 }
 
-seller_utxo () {
-    local seller_name=$1
-    local tx_out_ref=$(cardano-cli conway transaction txid --tx-file "$keypath/${seller_name}Sells.tx")#0
+utxo_resolved () {
+    local oref=$1
     echo $(cardano-cli conway query utxo --address $onRampAddr --testnet-magic $mN --out-file /dev/stdout |
-               jq -c --arg key "$tx_out_ref" '.[$key]')
+               jq -c --arg key "$oref" '.[$key]')
+}
+
+is_selected_seller () {
+    local selected_oref=$1
+    local seller_name=$2
+    local seller_oref=$(cardano-cli conway transaction txid --tx-file "$keypath/${seller_name}Sells.tx")#0
+
+    if [ "$seller_oref" == "$selected_oref" ]; then
+        return 0  # true
+    else
+        return 1  # false
+    fi
+}
+
+record_selected_seller_name () {
+    local selected_oref=$1
+    shift
+
+    for name in "$@"; do
+        if is_selected_seller "$selected_oref" "$name"; then
+	    printf "$name" > $assets/sellChoiceName.txt
+            return 0
+        fi
+    done
+    echo "Unable to identify selected seller."
+    exit 1
 }
 
 #--------------------------- :select best seller: ------------------------------
@@ -52,27 +79,30 @@ echo ""
 echo "Choosing best sell offer..."
 echo ""
 
-# Example: selecting best offer among three sellers.
-cabal run p2p-choose-offer  -- "barbara" $(seller_utxo "barbara") \
-                               "bob" $(seller_utxo "bob") \
-                               "brandon" $(seller_utxo "brandon")
+onRampUtxos=$(cardano-cli conway query utxo --address $onRampAddr --testnet-magic $mN --out-file /dev/stdout | jq -c 'to_entries')
 
-seller=$(cat $assets/sellerChoice.txt)
-echo "Selected sell offer: $seller"
+cabal run p2p-choose-offer -- "$onRampUtxos"  # Selects TxOutRef for best sell offer
+sellerOut=$(cat $assets/sellChoiceOref.txt)
 
-sellerRedeemer="$assets/${seller}SoldRedeemer.cbor"
-sellerOut=$(cardano-cli conway transaction txid --tx-file "$keypath/${seller}Sells.tx")#0
-sellerOutResolved=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
-                         jq -r --arg key "$sellerOut" '.[$key]')
-sellerLovelace=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
-                          jq -r --arg key "$sellerOut" '.[$key].value.lovelace')
+echo "sellerOut:"
+echo $sellerOut
+
+record_selected_seller_name "$sellerOut" "${sellerNamesAll[@]}"  # Record name of selected seller
+sellerName=$(cat $assets/sellChoiceName.txt)
+
+echo "Selected TxOutRef: $sellerOut"
+echo "Selected seller: $sellerName"
+
+sellerRedeemer="$assets/${sellerName}SoldRedeemer.cbor"
+sellerOutResolved=$(utxo_resolved $sellerOut)
+sellerLovelace=$(echo $sellerOutResolved | jq '.value.lovelace')
 
 #-------------------------------- :buy order: ----------------------------------
 
 echo ""
 echo "Generating buyer's datum and redeemer..."
 
-cabal run p2p-buy-order -- "charlie" $charlieAddr $seller $(seller_utxo $seller)
+cabal run p2p-buy-order -- "charlie" $charlieAddr $sellerName $sellerOutResolved
 
 echo ""
 echo "Buy-order transaction..."

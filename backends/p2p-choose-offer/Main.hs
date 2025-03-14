@@ -1,16 +1,28 @@
 module Main where
 
-import           Data.List                  (maximumBy)
-import           Data.Ord                   (comparing)
-import           P2P.Example                (choiceValue)
+import           Data.Aeson                        (eitherDecode, FromJSON, parseJSON, withObject, (.:))
+import qualified Data.ByteString.Lazy.Char8 as BL8
+import           Data.Coerce
+import           Data.List                         (maximumBy)
+import           Data.Ord                          (comparing)
+import           P2P.Example                       (choiceValue)
 import           Prelude
-import           System.Directory           (getCurrentDirectory)
-import           System.Environment         (getArgs)
-import           System.FilePath            (takeFileName, (</>))
-import qualified System.IO                  as IO
+import           System.Directory                  (getCurrentDirectory)
+import           System.Environment                (getArgs)
+import           System.FilePath                   (takeFileName, (</>))
+import qualified System.IO                         as IO
 
-import           ZkFold.Cardano.Parse.Utils (parseOnRampDatum)
+import           ZkFold.Cardano.Parse.Utils        (OnRampDatumJSON (..), OnRampUtxo (..))
 
+
+data OnRampUtxoKV = OnRampUtxoKV { oref :: String, resolved :: OnRampUtxo }
+  deriving Show
+
+instance FromJSON OnRampUtxoKV where
+    parseJSON = withObject "OnRampUtxoKV" $ \obj -> do
+        oref     <- obj .: "key"
+        resolved <- obj .: "value"
+        return $ OnRampUtxoKV oref resolved
 
 main :: IO ()
 main = do
@@ -24,30 +36,21 @@ main = do
 
   argsRaw <- getArgs
 
-  if null argsRaw then error "No sellers!" else
-    if length argsRaw `mod` 2 == 1 then error "Expected an even number of command-line arguments."
-    else do
-      let (names, utxosStr) = splitPairs argsRaw
-
-      case mapM parseOnRampDatum utxosStr of
-        Right datums -> do
-          let choiceValues = map choiceValue datums
+  case argsRaw of
+    (utxosStr : _) -> do
+      case eitherDecode @[OnRampUtxoKV] $ BL8.pack utxosStr of
+        Right utxos -> do
+          let orefs        = map oref utxos
+              choiceValues = map (choiceValue . coerce . inlineDatum . resolved) utxos
               maxI         = maxIndex choiceValues
 
-          IO.writeFile (assetsPath </> "sellerChoice.txt") $ names !! maxI  -- Selected seller
+          IO.writeFile (assetsPath </> "sellChoiceOref.txt") $ orefs !! maxI
 
-        Left err     -> error err
+        Left err    -> error err
+    _ -> error "Expected one command-line argument"
 
 
 ----- HELPER FUNCTIONS -----
-
--- | Split elements according to their even/odd position.
-splitPairs :: [a] -> ([a], [a])
-splitPairs xs = unzip $ go xs
-  where
-    go []       = []
-    go (x:y:zs) = (x, y) : go zs
-    go _        = error "absurd"
 
 -- | Position index of maximum.
 maxIndex :: (Ord a) => [a] -> Int
