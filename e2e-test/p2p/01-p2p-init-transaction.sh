@@ -22,8 +22,6 @@ else
     pause=4
 fi
 
-unitDatum=$assets/unit.cbor
-
 in1=$(cardano-cli conway query utxo --address $(cat $keypath/alice.addr) --testnet-magic $mN --out-file /dev/stdout |
 	  jq -r 'to_entries | map(select(.value.value.lovelace > 5000000)) | .[0].key')
 
@@ -35,7 +33,7 @@ echo "Initialization..."
 aliceAddress=$(cat $keypath/alice.addr)
 echo "alice address: $aliceAddress"
 
-cabal run p2p-init-transaction -- $aliceAddress
+cabal run p2p-init-transaction -- "alice" $aliceAddress
 
 #------------------------------------- :onRamp setup: ------------------------------------
 
@@ -108,7 +106,7 @@ echo "Funding Barbara, Bob, Brandon and Charlie..."
 echo ""
 
 funds1=100000000  # 100 ADA
-funds2=5000000    #   5 ADA
+funds2=10000000   #  10 ADA
 
 cardano-cli conway transaction build \
     --testnet-magic $mN \

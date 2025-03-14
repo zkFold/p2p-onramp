@@ -30,7 +30,7 @@ extractKey filePath = do
       then Right $ B8.drop (B8.length rawBytes - 32) rawBytes
       else Left "Unable to retrieve rawbytes"
 
--- | Extract key checking it is a valid secret key
+-- | Extract secret key
 extractSecretKey :: FilePath -> IO (Either String SecretKey)
 extractSecretKey filePath = do
   skBytesE <- extractKey filePath

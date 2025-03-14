@@ -19,9 +19,9 @@ import           Prelude                      (Show)
 import           ZkFold.Cardano.OnChain.Utils (dataToBlake)
 
 data OnRampParams = OnRampParams
-  { feeAddress          :: Address
-  , feeValue            :: Value
-  , fiatPubKeyHashBytes :: BuiltinByteString
+  { feeAddress      :: Address
+  , feeValue        :: Value
+  , fiatPubKeyBytes :: BuiltinByteString
   }
   deriving stock (Generic, Show)
 
@@ -83,7 +83,7 @@ onRamp _ (Update signed sellerPubKey) ctx =
     -- Check the seller's signature
     && verifyEd25519Signature sellerPubKey (dataToBlake dat') signed
 
-    -- Check the seller's pub key in redeemer
+    -- Check compatibility of seller's pub-key (redeemer) with seller's pub-key-hash (datum)
     && (getPubKeyHash $ sellerPubKeyHash dat) == blake2b_224 sellerPubKey
 onRamp _ Cancel ctx =
   let
@@ -126,7 +126,7 @@ onRamp OnRampParams{..} (Claim sig) ctx =
 
     -- The fiat payment processor must sign the hash of the fiat payment info
     -- TODO: this can be replaced with a ZK proof of the fiat payment
-    && verifyEd25519Signature fiatPubKeyHashBytes (dataToBlake $ paymentInfoHash dat) sig
+    && verifyEd25519Signature fiatPubKeyBytes (dataToBlake $ paymentInfoHash dat) sig
 
     -- The fee must be sent to the fee address
     && addr'' == feeAddress

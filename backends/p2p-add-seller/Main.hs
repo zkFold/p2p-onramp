@@ -1,29 +1,32 @@
 module Main where
 
+import           Crypto.PubKey.Ed25519
+import qualified Data.ByteArray                as BA
 import qualified Data.ByteString               as BS
 import           P2P.Example                   (paymentInfoHashEx1)
 import           PlutusLedgerApi.V1.Value      (lovelaceValue)
 import           PlutusLedgerApi.V3            as V3
-import           Prelude                       (Bool (..), Either (..), IO,
-                                                Integer, Maybe (..), error,
-                                                return, show, ($), (++), (.))
+import           PlutusTx.Prelude              hiding (error)
+import           Prelude                       (IO, String, error, show)
 import           System.Directory              (createDirectoryIfMissing,
                                                 getCurrentDirectory)
 import           System.Environment            (getArgs)
 import           System.FilePath               (takeFileName, (</>))
 
+import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress)
+import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.Parse.Utils    (parseInteger)
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..), OnRampRedeemer (..))
 
 
-sellerOnRampDatum :: Integer -> Integer -> V3.Address -> Integer -> OnRampDatum
-sellerOnRampDatum sellPrice lovelaceSold sellerAddr deadline =
+sellerOnRampDatum :: String -> Integer -> Integer  -> V3.Address -> Integer -> OnRampDatum
+sellerOnRampDatum sellerName sellPrice lovelaceSold sellerAddr deadline =
   let sellerPkh = case addressCredential sellerAddr of
         PubKeyCredential pkh -> pkh
         _                    -> error $ "Expected 'PubKeyCredential'"
 
-  in OnRampDatum { paymentInfoHash  = paymentInfoHashEx1
+  in OnRampDatum { paymentInfoHash  = paymentInfoHashEx1 sellerName
                  , sellPriceUsd     = sellPrice
                  , valueSold        = lovelaceValue . Lovelace $ lovelaceSold
                  , sellerPubKeyHash = sellerPkh
@@ -40,31 +43,37 @@ main = do
         _          -> "."
 
   let assetsPath = path </> "assets"
+      keysPath   = path </> "e2e-test" </> "p2p" </> "keys"
 
   createDirectoryIfMissing True $ path </> "assets"
 
   argsRaw <- getArgs
 
   case argsRaw of
-    (sellerName : sellPriceStr : lovelaceSoldStr : sellerAddrStr : deadlineStr : _) -> do
+    (fiatAdminName : sellerName : sellPriceStr : lovelaceSoldStr : sellerAddrStr : deadlineStr : _) -> do
+      skE <- extractSecretKey (keysPath </> (fiatAdminName ++ ".skey"))  -- Fiat admin will sign fiat payment info
+
       let argsE = do
+            sk           <- skE
             sellPrice    <- parseInteger sellPriceStr
             lovelaceSold <- parseInteger lovelaceSoldStr
             sellerAddr   <- parseAddress sellerAddrStr
             deadline     <- parseInteger deadlineStr
 
-            return (sellPrice, lovelaceSold, sellerAddr, deadline)
+            return (sk, sellPrice, lovelaceSold, sellerAddr, deadline)
 
       case argsE of
-        Right params4 -> do
-          BS.writeFile (assetsPath </> (sellerName ++ ".cbor")) $ dataToCBOR . uncurry4 sellerOnRampDatum $ params4
+        Right (sk, sellPrice, lovelaceSold, sellerAddr, deadline) -> do
+          let vk  = toPublic sk
+              sig = sign sk vk . fromBuiltin . dataToBlake . paymentInfoHashEx1 $ sellerName
+
+          let claimRedeemer = Claim . toBuiltin @BS.ByteString . BA.convert $ sig
+
+          BS.writeFile (assetsPath </> (sellerName ++ "SellDatum.cbor")) $ dataToCBOR $
+            sellerOnRampDatum sellerName sellPrice lovelaceSold sellerAddr deadline
+
+          BS.writeFile (assetsPath </> (sellerName ++ "PaymentInfoRedeemer.cbor")) $ dataToCBOR claimRedeemer
 
         Left err -> error $ "parse error: " ++ show err
 
-    _ -> error "Error: expected five command-line arguments.\n"
-
-
------ HELPER FUNCTIONS -----
-
-uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
-uncurry4 f (a, b, c, d) = f a b c d
+    _ -> error "Error: expected six command-line arguments.\n"

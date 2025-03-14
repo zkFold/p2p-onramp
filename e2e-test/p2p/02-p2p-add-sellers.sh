@@ -22,7 +22,6 @@ else
     inv_slot_length=10
 fi
 
-unitDatum=$assets/unit.cbor
 onRampAddr=$(cat $keypath/onRamp.addr)
 
 #---------------------------------- :macros: -----------------------------------
@@ -46,6 +45,14 @@ random_integer () {
 
 echo "Adding sellers..."
 
+# Arguments for cabal executable 'p2p-add-seller':
+# 1) Fiat administrator name
+# 2) Seller name
+# 3) Sell price
+# 4) Value sold (lovelace)
+# 5) Seller address
+# 6) Buy deadline
+
 sellPrice=$(random_integer 30 40)
 lovelaceSold=$(random_integer 30000000 40000000)
 barbaraAddr=$(cat $keypath/barbara.addr)
@@ -55,7 +62,7 @@ echo ""
 echo "Barbara sells $lovelaceSold lovelace..."
 echo ""
 
-cabal run p2p-add-seller -- "barbara" $sellPrice $lovelaceSold $barbaraAddr $deadline
+cabal run p2p-add-seller -- "alice" "barbara" $sellPrice $lovelaceSold $barbaraAddr $deadline
 
 in1=$(cardano-cli conway query utxo --address $(cat $keypath/barbara.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 
@@ -63,7 +70,7 @@ cardano-cli conway transaction build \
     --testnet-magic $mN \
     --tx-in $in1 \
     --tx-out "$onRampAddr + $lovelaceSold lovelace" \
-    --tx-out-inline-datum-cbor-file $assets/barbara.cbor \
+    --tx-out-inline-datum-cbor-file $assets/barbaraSellDatum.cbor \
     --change-address $barbaraAddr \
     --out-file $keypath/barbaraSells.txbody
 
@@ -88,7 +95,7 @@ echo ""
 echo "Bob sells $lovelaceSold lovelace..."
 echo ""
 
-cabal run p2p-add-seller -- "bob" $sellPrice $lovelaceSold $bobAddr $deadline
+cabal run p2p-add-seller -- "alice" "bob" $sellPrice $lovelaceSold $bobAddr $deadline
 
 in2=$(cardano-cli conway query utxo --address $(cat $keypath/bob.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 
@@ -96,7 +103,7 @@ cardano-cli conway transaction build \
     --testnet-magic $mN \
     --tx-in $in2 \
     --tx-out "$onRampAddr + $lovelaceSold lovelace" \
-    --tx-out-inline-datum-cbor-file $assets/bob.cbor \
+    --tx-out-inline-datum-cbor-file $assets/bobSellDatum.cbor \
     --change-address $bobAddr \
     --out-file $keypath/bobSells.txbody
 
@@ -121,7 +128,7 @@ echo ""
 echo "Brandon sells $lovelaceSold lovelace..."
 echo ""
 
-cabal run p2p-add-seller -- "brandon" $sellPrice $lovelaceSold $brandonAddr $deadline
+cabal run p2p-add-seller -- "alice" "brandon" $sellPrice $lovelaceSold $brandonAddr $deadline
 
 in3=$(cardano-cli conway query utxo --address $(cat $keypath/brandon.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 
@@ -129,7 +136,7 @@ cardano-cli conway transaction build \
     --testnet-magic $mN \
     --tx-in $in3 \
     --tx-out "$onRampAddr + $lovelaceSold lovelace" \
-    --tx-out-inline-datum-cbor-file $assets/brandon.cbor \
+    --tx-out-inline-datum-cbor-file $assets/brandonSellDatum.cbor \
     --change-address $brandonAddr \
     --out-file $keypath/brandonSells.txbody
 

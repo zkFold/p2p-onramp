@@ -18,10 +18,9 @@ import           System.FilePath               (takeFileName, (</>))
 import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
+import           ZkFold.Cardano.Parse.Utils    (parseOnRampDatum)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..),
                                                 OnRampRedeemer (..))
-
-import           ZkFold.Cardano.Parse.Utils    (parseOnRampDatum)
 
 
 main :: IO ()

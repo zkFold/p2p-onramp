@@ -9,7 +9,7 @@ set -o pipefail
 assets=../assets
 keypath=./p2p/keys
 
-find $keypath/ -type f \( ! -name "alice.*" -and ! -name "splitAlice.tx" \) -exec rm {} +
+find $keypath/ -type f \( ! -name "alice.*" \) -exec rm {} +
 rm -r $assets
 
 echo ""

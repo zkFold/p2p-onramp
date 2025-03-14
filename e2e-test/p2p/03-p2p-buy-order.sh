@@ -58,7 +58,7 @@ echo ""
 echo "Generating buyer's datum and redeemer..."
 
 cabal run p2p-buy-order -- "charlie" "$charlieAddr" "barbara" "$barbaraOutResolved"
-exit 1
+
 echo ""
 echo "Buy-order transaction..."
 echo ""
@@ -96,3 +96,18 @@ cardano-cli conway transaction build \
     cardano-cli conway transaction submit \
 	--testnet-magic $mN \
 	--tx-file $keypath/charlieBuys.tx
+
+buysTx=$(cardano-cli conway transaction txid --tx-file "$keypath/charlieBuys.tx")
+buysOut=$buysTx#0
+while true; do
+    txOnChain=$(cardano-cli conway query utxo --address $onRampAddr --testnet-magic $mN --out-file /dev/stdout | jq -r --arg key "$buysOut" 'has($key) | tostring')
+    if [ $txOnChain == "false" ]; then
+	echo "Waiting to see buy order tx onchain..."
+	sleep $pause
+    else
+	echo ""
+	echo "Transaction Id: $buysTx"
+	echo ""
+	break
+    fi
+done
