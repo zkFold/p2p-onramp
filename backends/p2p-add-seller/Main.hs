@@ -13,26 +13,22 @@ import           System.Directory              (createDirectoryIfMissing,
 import           System.Environment            (getArgs)
 import           System.FilePath               (takeFileName, (</>))
 
-import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
-import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress)
+import           ZkFold.Cardano.Crypto.Utils   (extractKey, extractSecretKey)
+import           ZkFold.Cardano.OffChain.Utils (dataToCBOR)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.Parse.Utils    (parseInteger)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..), OnRampRedeemer (..))
 
 
-sellerOnRampDatum :: String -> Integer -> Integer  -> V3.Address -> Integer -> OnRampDatum
-sellerOnRampDatum sellerName sellPrice lovelaceSold sellerAddr deadline =
-  let sellerPkh = case addressCredential sellerAddr of
-        PubKeyCredential pkh -> pkh
-        _                    -> error $ "Expected 'PubKeyCredential'"
-
-  in OnRampDatum { paymentInfoHash  = paymentInfoHashEx1 sellerName
-                 , sellPriceUsd     = sellPrice
-                 , valueSold        = lovelaceValue . Lovelace $ lovelaceSold
-                 , sellerPubKeyHash = sellerPkh
-                 , buyerPubKeyHash  = Nothing
-                 , timelock         = Just $ POSIXTime deadline
-                 }
+sellerOnRampDatum :: String -> BS.ByteString -> Integer -> Integer  -> Integer -> OnRampDatum
+sellerOnRampDatum sellerName sellerPubKey sellPrice lovelaceSold deadline =
+  OnRampDatum { paymentInfoHash   = paymentInfoHashEx1 sellerName
+              , sellPriceUsd      = sellPrice
+              , valueSold         = lovelaceValue . Lovelace $ lovelaceSold
+              , sellerPubKeyBytes = toBuiltin sellerPubKey
+              , buyerPubKeyHash   = Nothing
+              , timelock          = Just $ POSIXTime deadline
+              }
 
 main :: IO ()
 main = do
@@ -50,30 +46,33 @@ main = do
   argsRaw <- getArgs
 
   case argsRaw of
-    (fiatAdminName : sellerName : sellPriceStr : lovelaceSoldStr : sellerAddrStr : deadlineStr : _) -> do
-      skE <- extractSecretKey (keysPath </> (fiatAdminName ++ ".skey"))  -- Fiat admin will sign fiat payment info
+    (fiatAdminName : sellerName : sellPriceStr : lovelaceSoldStr : deadlineStr : _) -> do
+      skFiatE   <- extractSecretKey (keysPath </> (fiatAdminName ++ ".skey"))  -- Get fiat admin's private key
+      vkSellerE <- extractKey (keysPath </> (sellerName ++ ".vkey"))           -- Get seller's public key
 
       let argsE = do
-            sk           <- skE
+            skFiat       <- skFiatE
+            vkSeller     <- vkSellerE
             sellPrice    <- parseInteger sellPriceStr
             lovelaceSold <- parseInteger lovelaceSoldStr
-            sellerAddr   <- parseAddress sellerAddrStr
             deadline     <- parseInteger deadlineStr
 
-            return (sk, sellPrice, lovelaceSold, sellerAddr, deadline)
+            return (skFiat, vkSeller, sellPrice, lovelaceSold, deadline)
 
       case argsE of
-        Right (sk, sellPrice, lovelaceSold, sellerAddr, deadline) -> do
-          let vk  = toPublic sk
-              sig = sign sk vk . fromBuiltin . dataToBlake . paymentInfoHashEx1 $ sellerName
+        Right (skFiat, vkSeller, sellPrice, lovelaceSold, deadline) -> do
+          let vkFiat = toPublic skFiat
+
+          -- Fiat admin signs fiat payment info
+          let sig = sign skFiat vkFiat . fromBuiltin . dataToBlake . paymentInfoHashEx1 $ sellerName
 
           let claimRedeemer = Claim . toBuiltin @BS.ByteString . BA.convert $ sig
 
           BS.writeFile (assetsPath </> (sellerName ++ "SellDatum.cbor")) $ dataToCBOR $
-            sellerOnRampDatum sellerName sellPrice lovelaceSold sellerAddr deadline
+            sellerOnRampDatum sellerName vkSeller sellPrice lovelaceSold deadline
 
           BS.writeFile (assetsPath </> (sellerName ++ "PaymentInfoRedeemer.cbor")) $ dataToCBOR claimRedeemer
 
         Left err -> error $ "parse error: " ++ show err
 
-    _ -> error "Error: expected six command-line arguments.\n"
+    _ -> error "Error: expected five command-line arguments.\n"

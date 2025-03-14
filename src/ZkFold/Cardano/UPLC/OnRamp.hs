@@ -29,20 +29,19 @@ makeLift ''OnRampParams
 makeIsDataIndexed ''OnRampParams [('OnRampParams,0)]
 
 data OnRampDatum = OnRampDatum
-    { paymentInfoHash  :: BuiltinByteString
-    , sellPriceUsd     :: Integer
-    , valueSold        :: Value
-    , sellerPubKeyHash :: PubKeyHash
-    , buyerPubKeyHash  :: Maybe PubKeyHash
-    , timelock         :: Maybe POSIXTime
+    { paymentInfoHash   :: BuiltinByteString
+    , sellPriceUsd      :: Integer
+    , valueSold         :: Value
+    , sellerPubKeyBytes :: BuiltinByteString
+    , buyerPubKeyHash   :: Maybe PubKeyHash
+    , timelock          :: Maybe POSIXTime
     }
     deriving stock (Generic, Show)
 
 makeIsDataIndexed ''OnRampDatum [('OnRampDatum,0)]
 
 data OnRampRedeemer
-  = Update BuiltinByteString  -- Signed data by seller
-           BuiltinByteString  -- Seller's public key
+  = Update BuiltinByteString  -- Signed updated datum by seller
   -- ^ Update the bid with the buyer's public key hash and the timelock.
   | Claim BuiltinByteString
   -- ^ Buyer claims the value.
@@ -55,7 +54,7 @@ makeIsDataIndexed ''OnRampRedeemer [('Cancel,0),('Update,1),('Claim,2)]
 -- | Plutus script for a trustless P2P on-ramp.
 {-# INLINABLE onRamp #-}
 onRamp :: OnRampParams -> OnRampRedeemer -> ScriptContext -> Bool
-onRamp _ (Update signed sellerPubKey) ctx =
+onRamp _ (Update signed) ctx =
   let
     -- Get the current on-ramp output
     (addr, val, dat) = case findOwnInput ctx of
@@ -75,16 +74,13 @@ onRamp _ (Update signed sellerPubKey) ctx =
     && val' == val
     && paymentInfoHash dat' == paymentInfoHash dat
     && sellPriceUsd dat' == sellPriceUsd dat
-    && sellerPubKeyHash dat' == sellerPubKeyHash dat
+    && sellerPubKeyBytes dat' == sellerPubKeyBytes dat
     && isJust (buyerPubKeyHash dat')
     -- The timelock must be in the future
     && maybe False (\t -> t `after` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat')
 
     -- Check the seller's signature
-    && verifyEd25519Signature sellerPubKey (dataToBlake dat') signed
-
-    -- Check compatibility of seller's pub-key (redeemer) with seller's pub-key-hash (datum)
-    && (getPubKeyHash $ sellerPubKeyHash dat) == blake2b_224 sellerPubKey
+    && verifyEd25519Signature (sellerPubKeyBytes dat) (dataToBlake dat') signed
 onRamp _ Cancel ctx =
   let
     -- Get the current on-ramp output
@@ -96,12 +92,15 @@ onRamp _ Cancel ctx =
     (addr', val') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
       TxOut a v NoOutputDatum Nothing -> (a, v)
       _                               -> traceError "onRamp: missing output"
+
+    -- Derive seller's pub key hash
+    sellerPubKeyHash = blake2b_224 $ sellerPubKeyBytes dat
   in
     -- The timelock is either not set or must be in the past
     maybe True (\t -> t `before` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat)
 
     -- The value must be returned to the seller
-    && addr' == Address (PubKeyCredential $ sellerPubKeyHash dat) Nothing
+    && addr' == Address (PubKeyCredential $ PubKeyHash sellerPubKeyHash) Nothing
     && val' == val
 onRamp OnRampParams{..} (Claim sig) ctx =
   let

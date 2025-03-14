@@ -57,9 +57,7 @@ main = do
           let nextDat = prevDat { buyerPubKeyHash = Just buyerPkh }
 
           let sig            = sign sk vk . fromBuiltin $ dataToBlake nextDat
-              updateRedeemer = Update
-                               ( toBuiltin @BS.ByteString . BA.convert $ sig )
-                               ( toBuiltin @BS.ByteString . BA.convert $ vk )
+              updateRedeemer = Update . toBuiltin @BS.ByteString . BA.convert $ sig
 
           putStrLn "\nVerifies signature:"
           print $ verifyEd25519Signature (toBuiltin @BS.ByteString . BA.convert $ vk) (dataToBlake nextDat) (toBuiltin @BS.ByteString . BA.convert $ sig)

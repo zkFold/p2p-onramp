@@ -50,8 +50,7 @@ echo "Adding sellers..."
 # 2) Seller name
 # 3) Sell price
 # 4) Value sold (lovelace)
-# 5) Seller address
-# 6) Buy deadline
+# 5) Buy deadline
 
 sellPrice=$(random_integer 30 40)
 lovelaceSold=$(random_integer 30000000 40000000)
@@ -62,7 +61,7 @@ echo ""
 echo "Barbara sells $lovelaceSold lovelace..."
 echo ""
 
-cabal run p2p-add-seller -- "alice" "barbara" $sellPrice $lovelaceSold $barbaraAddr $deadline
+cabal run p2p-add-seller -- "alice" "barbara" $sellPrice $lovelaceSold $deadline
 
 in1=$(cardano-cli conway query utxo --address $(cat $keypath/barbara.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 
@@ -95,7 +94,7 @@ echo ""
 echo "Bob sells $lovelaceSold lovelace..."
 echo ""
 
-cabal run p2p-add-seller -- "alice" "bob" $sellPrice $lovelaceSold $bobAddr $deadline
+cabal run p2p-add-seller -- "alice" "bob" $sellPrice $lovelaceSold $deadline
 
 in2=$(cardano-cli conway query utxo --address $(cat $keypath/bob.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 
@@ -128,7 +127,7 @@ echo ""
 echo "Brandon sells $lovelaceSold lovelace..."
 echo ""
 
-cabal run p2p-add-seller -- "alice" "brandon" $sellPrice $lovelaceSold $brandonAddr $deadline
+cabal run p2p-add-seller -- "alice" "brandon" $sellPrice $lovelaceSold $deadline
 
 in3=$(cardano-cli conway query utxo --address $(cat $keypath/brandon.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 
