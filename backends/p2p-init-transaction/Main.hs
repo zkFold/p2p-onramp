@@ -3,9 +3,9 @@ module Main where
 import qualified Data.ByteString               as BS
 import           PlutusLedgerApi.V1.Value      (lovelaceValue)
 import           PlutusLedgerApi.V3            as V3
-import           Prelude                       (Bool (..), Either (..),
-                                                IO, error, putStr, return,
-                                                show, ($), (.), (++))
+import           Prelude                       (Bool (..), Either (..), IO,
+                                                error, putStr, return, show,
+                                                ($), (++), (.))
 import           System.Directory              (createDirectoryIfMissing,
                                                 getCurrentDirectory)
 import           System.Environment            (getArgs)

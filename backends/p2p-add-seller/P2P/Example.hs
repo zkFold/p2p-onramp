@@ -1,9 +1,9 @@
 module P2P.Example where
 
-import qualified Data.ByteString.Char8  as B8
+import qualified Data.ByteString.Char8 as B8
 import           PlutusLedgerApi.V3
-import           Prelude            (String)
 import           PlutusTx.Prelude
+import           Prelude               (String)
 
 
 -- | Payment info hash example.

@@ -3,13 +3,13 @@
 module ZkFold.Cardano.Parse.Utils where
 
 import           Cardano.Api                   as Api
-import           GHC.IsList                    (toList)
-import           PlutusLedgerApi.V1.Value
 import           Data.Aeson                    (eitherDecode, parseJSON)
 import qualified Data.Aeson                    as Aeson
 import qualified Data.ByteString.Lazy.Char8    as BL8
 import           Data.Coerce
 import           GHC.Generics                  (Generic)
+import           GHC.IsList                    (toList)
+import           PlutusLedgerApi.V1.Value
 import           PlutusLedgerApi.V3            as V3
 import           Prelude
 import           Text.Parsec                   (parse)
@@ -68,7 +68,7 @@ instance FromJSON ValueJSON where
 -- | Parsing 'Value' from a string representation of 'OnRampUtxo'
 parseValue :: String -> Either String V3.Value
 parseValue utxoStr = coerce . value <$> eitherDecode (BL8.pack utxoStr)
-  
+
 
 ----- PARSE 'Integer' -----
 

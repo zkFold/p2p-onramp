@@ -17,7 +17,8 @@ import           ZkFold.Cardano.Crypto.Utils   (extractKey, extractSecretKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToCBOR)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.Parse.Utils    (parseInteger)
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..), OnRampRedeemer (..))
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..),
+                                                OnRampRedeemer (..))
 
 
 sellerOnRampDatum :: String -> BS.ByteString -> Integer -> Integer  -> Integer -> OnRampDatum
