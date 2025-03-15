@@ -6,7 +6,7 @@ import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Base16        as B16
 import qualified Data.ByteString.Char8         as B8
 import           PlutusTx.Prelude              hiding (error)
-import           Prelude                       (IO, error, show, print, putStr)
+import           Prelude                       (IO, error, print, putStr, show)
 import           System.Directory              (getCurrentDirectory)
 import           System.Environment            (getArgs)
 import           System.FilePath               (takeFileName, (</>))

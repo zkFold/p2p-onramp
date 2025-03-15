@@ -1,18 +1,20 @@
 module Main where
 
-import           Data.Aeson                        (eitherDecode, FromJSON, parseJSON, withObject, (.:))
+import           Data.Aeson                 (FromJSON, eitherDecode, parseJSON,
+                                             withObject, (.:))
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Coerce
-import           Data.List                         (maximumBy)
-import           Data.Ord                          (comparing)
+import           Data.List                  (maximumBy)
+import           Data.Ord                   (comparing)
 import           Prelude
-import           System.Directory                  (getCurrentDirectory)
-import           System.Environment                (getArgs)
-import           System.FilePath                   (takeFileName, (</>))
-import qualified System.IO                         as IO
+import           System.Directory           (getCurrentDirectory)
+import           System.Environment         (getArgs)
+import           System.FilePath            (takeFileName, (</>))
+import qualified System.IO                  as IO
 
-import           ZkFold.Cardano.P2P.Example        (choiceValue)
-import           ZkFold.Cardano.Parse.Utils        (OnRampDatumJSON (..), OnRampUtxo (..))
+import           ZkFold.Cardano.P2P.Example (choiceValue)
+import           ZkFold.Cardano.Parse.Utils (OnRampDatumJSON (..),
+                                             OnRampUtxo (..))
 
 
 data OnRampUtxoKV = OnRampUtxoKV { oref :: String, resolved :: OnRampUtxo }
