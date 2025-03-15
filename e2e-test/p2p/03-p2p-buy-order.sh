@@ -25,8 +25,6 @@ fi
 onRampAddr=$(cat $keypath/onRamp.addr)
 onRampPlutus=$assets/onRamp.plutus
 
-sellerNamesAll=("barbara" "bob" "brandon")
-
 charlieDatum=$assets/charlieBoughtDatum.cbor
 charlieAddr=$(cat $keypath/charlie.addr)
 
@@ -59,11 +57,12 @@ is_selected_seller () {
     fi
 }
 
+read -r -a sellerNamesAll < $keypath/sellerNamesAll.txt
+
 identify_selected_seller_name () {
     local selected_oref=$1
-    shift
 
-    for name in "$@"; do
+    for name in "${sellerNamesAll[@]}"; do
         if is_selected_seller "$selected_oref" "$name"; then
 	    printf "$name" > $assets/sellChoiceName.txt
             return 0
@@ -84,10 +83,10 @@ onRampUtxos=$(cardano-cli conway query utxo --address $onRampAddr --testnet-magi
 cabal run p2p-choose-offer -- "$onRampUtxos"  # Selects TxOutRef for best sell offer
 sellerOut=$(cat $assets/sellChoiceOref.txt)
 
-identify_selected_seller_name "$sellerOut" "${sellerNamesAll[@]}"  # Identify name of selected seller
+identify_selected_seller_name "$sellerOut"    # Identify name of selected seller
 sellerName=$(cat $assets/sellChoiceName.txt)
 
-echo "Selected seller: $sellerName"
+echo "Selected seller: $(echo $sellerName | sed -E 's/^(.)/\U\1/')"
 
 sellerRedeemer="$assets/${sellerName}SoldRedeemer.cbor"
 sellerOutResolved=$(utxo_resolved $sellerOut)

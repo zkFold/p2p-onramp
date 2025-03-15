@@ -113,8 +113,8 @@ charlieAddress=$(cat $keypath/charlie.addr)
 echo ""
 echo "Funding wallets..."
 
-funds1=100000000  # 100 ADA
-funds2=10000000   #  10 ADA
+funds1=50000000  # 50 ADA
+funds2=10000000  # 10 ADA
 
 cardano-cli conway transaction build \
     --testnet-magic $mN \

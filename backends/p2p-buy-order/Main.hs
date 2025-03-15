@@ -68,6 +68,9 @@ main = do
           BS.writeFile (assetsPath </> (buyerName ++ "BoughtDatum.cbor")) $ dataToCBOR nextDat
           BS.writeFile (assetsPath </> (sellerName ++ "SoldRedeemer.cbor")) $ dataToCBOR updateRedeemer
 
+          putStr $ "\nWrote " ++ buyerName ++ "BoughtDatum.cbor\n"
+          putStr $ "Wrote " ++ sellerName ++ "SoldRedeemer.cbor\n"
+
         Left e                        -> error e
 
     _ -> error "Please provide four command-line arguments.\n"

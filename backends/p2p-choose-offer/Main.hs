@@ -44,13 +44,13 @@ main = do
         Right utxos -> do
           let orefs        = map oref utxos
               choiceValues = map (choiceValue . coerce . inlineDatum . resolved) utxos
-              maxI         = maxIndex choiceValues
+              maxI         = maxIndex choiceValues  -- Selects best sell offer
 
           let sellChoiceOref = orefs !! maxI
 
           putStr $ "Selected TxOutRef: " ++ sellChoiceOref ++ "\n"
 
-          IO.writeFile (assetsPath </> "sellChoiceOref.txt") $ orefs !! maxI
+          IO.writeFile (assetsPath </> "sellChoiceOref.txt") sellChoiceOref
 
         Left err    -> error err
     _ -> error "Expected one command-line argument"
@@ -58,6 +58,6 @@ main = do
 
 ----- HELPER FUNCTIONS -----
 
--- | Position index of maximum.
+-- | Position index of maximum in a list.
 maxIndex :: (Ord a) => [a] -> Int
 maxIndex xs = snd $ maximumBy (comparing fst) (zip xs [0..])
