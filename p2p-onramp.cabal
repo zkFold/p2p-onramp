@@ -81,6 +81,7 @@ library
     exposed-modules:
       ZkFold.Cardano.UPLC.OnRamp
       ZkFold.Cardano.Crypto.Utils
+      ZkFold.Cardano.P2P.Example
       ZkFold.Cardano.Parse.Utils
     build-depends:
       aeson                                      ,
@@ -120,7 +121,6 @@ executable p2p-add-seller
   default-language: Haskell2010
   ghc-options:      -rtsopts
   main-is:          Main.hs
-  other-modules:    P2P.Example
   hs-source-dirs:   backends/p2p-add-seller
   build-depends:
     aeson                          ,
@@ -129,7 +129,6 @@ executable p2p-add-seller
     cryptonite                     ,
     directory                      ,
     filepath                       ,
-    memory                         ,
     p2p-onramp                     ,
     plutus-ledger-api              ,
     plutus-tx                      ,
@@ -140,7 +139,6 @@ executable p2p-choose-offer
   default-language: Haskell2010
   ghc-options:      -rtsopts
   main-is:          Main.hs
-  other-modules:    P2P.Example
   hs-source-dirs:   backends/p2p-choose-offer
   build-depends:
     aeson                          ,
@@ -168,6 +166,24 @@ executable p2p-buy-order
     memory                         ,
     p2p-onramp                     ,
     plutus-ledger-api              ,
+    plutus-tx                      ,
+    zkfold-cardano
+
+executable p2p-claim-transaction
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  hs-source-dirs:   backends/p2p-claim-transaction
+  build-depends:
+    base              >= 4.9 && < 5,
+    base16-bytestring              ,
+    bytestring                     ,
+    cryptonite                     ,
+    directory                      ,
+    filepath                       ,
+    memory                         ,
+    p2p-onramp                     ,
     plutus-tx                      ,
     zkfold-cardano
 

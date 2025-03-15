@@ -47,7 +47,7 @@ isBarbaraUnspent=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp
 
 if [ $isBarbaraUnspent == "false" ]; then
     echo ""
-    echo "Barbara has sold, nothing to cancel."
+    echo "Barbara has sold or closed sell offer; nothing to cancel."
 else
     echo ""
     echo "Canceling Barbara's order..."
@@ -89,7 +89,6 @@ else
 	--tx-file $keypath/barbaraCancels.tx
 
     echo "Barbara's order has ben canceled."
-    echo ""
 fi
 
 #--------------------------------- :cancel Bob: --------------------------------
@@ -100,7 +99,7 @@ isBobUnspent=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.add
 
 if [ $isBobUnspent == "false" ]; then
     echo ""
-    echo "Bob has sold, nothing to cancel."
+    echo "Bob has sold or closed sell offer; nothing to cancel."
 else
     echo ""
     echo "Canceling Bob's order..."
@@ -142,7 +141,6 @@ else
 	--tx-file $keypath/bobCancels.tx
 
     echo "Bob's order has been canceled."
-    echo ""
 fi
 
 #------------------------------- :cancel Brandon: ------------------------------
@@ -153,7 +151,7 @@ isBrandonUnspent=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp
 
 if [ $isBrandonUnspent == "false" ]; then
     echo ""
-    echo "Brandon has sold, nothing to cancel."
+    echo "Brandon has sold or closed sell offer; nothing to cancel."
 else
     echo ""
     echo "Canceling Brandon's order..."

@@ -59,7 +59,7 @@ is_selected_seller () {
     fi
 }
 
-record_selected_seller_name () {
+identify_selected_seller_name () {
     local selected_oref=$1
     shift
 
@@ -84,13 +84,9 @@ onRampUtxos=$(cardano-cli conway query utxo --address $onRampAddr --testnet-magi
 cabal run p2p-choose-offer -- "$onRampUtxos"  # Selects TxOutRef for best sell offer
 sellerOut=$(cat $assets/sellChoiceOref.txt)
 
-echo "sellerOut:"
-echo $sellerOut
-
-record_selected_seller_name "$sellerOut" "${sellerNamesAll[@]}"  # Record name of selected seller
+identify_selected_seller_name "$sellerOut" "${sellerNamesAll[@]}"  # Identify name of selected seller
 sellerName=$(cat $assets/sellChoiceName.txt)
 
-echo "Selected TxOutRef: $sellerOut"
 echo "Selected seller: $sellerName"
 
 sellerRedeemer="$assets/${sellerName}SoldRedeemer.cbor"
@@ -106,7 +102,6 @@ cabal run p2p-buy-order -- "charlie" $charlieAddr $sellerName $sellerOutResolved
 
 echo ""
 echo "Buy-order transaction..."
-echo ""
 
 in1=$(cardano-cli conway query utxo --address $(cat $keypath/charlie.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 collateral=$in1

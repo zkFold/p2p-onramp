@@ -27,6 +27,8 @@ onRampPlutus=$assets/onRamp.plutus
 
 sellerName=$(cat $assets/sellChoiceName.txt)
 
+cabal run p2p-claim-transaction -- "alice" "$sellerName"
+
 charlieAddr=$(cat $keypath/charlie.addr)
 charlieRedeemer="$assets/${sellerName}PaymentInfoRedeemer.cbor"
 charlieOrderOut=$(cardano-cli conway transaction txid --tx-file "$keypath/charlieBuys.tx")#0
@@ -49,7 +51,6 @@ if [ $isCharlieOrderUnspent == "false" ]; then
 else
     echo ""
     echo "Claim transaction..."
-    echo ""
 
     charlieOrderOutResolved=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
 				  jq -r --arg key "$charlieOrderOut" '.[$key]')

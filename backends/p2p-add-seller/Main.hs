@@ -1,24 +1,20 @@
 module Main where
 
-import           Crypto.PubKey.Ed25519
-import qualified Data.ByteArray                as BA
 import qualified Data.ByteString               as BS
-import           P2P.Example                   (paymentInfoHashEx1)
 import           PlutusLedgerApi.V1.Value      (lovelaceValue)
 import           PlutusLedgerApi.V3            as V3
 import           PlutusTx.Prelude              hiding (error)
-import           Prelude                       (IO, String, error, show)
+import           Prelude                       (IO, String, error, putStr, show)
 import           System.Directory              (createDirectoryIfMissing,
                                                 getCurrentDirectory)
 import           System.Environment            (getArgs)
 import           System.FilePath               (takeFileName, (</>))
 
-import           ZkFold.Cardano.Crypto.Utils   (extractKey, extractSecretKey)
+import           ZkFold.Cardano.Crypto.Utils   (extractKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToCBOR)
-import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
+import           ZkFold.Cardano.P2P.Example    (paymentInfoHashEx1)
 import           ZkFold.Cardano.Parse.Utils    (parseInteger)
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..),
-                                                OnRampRedeemer (..))
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
 
 
 sellerOnRampDatum :: String -> BS.ByteString -> Integer -> Integer  -> Integer -> OnRampDatum
@@ -47,33 +43,24 @@ main = do
   argsRaw <- getArgs
 
   case argsRaw of
-    (fiatAdminName : sellerName : sellPriceStr : lovelaceSoldStr : deadlineStr : _) -> do
-      skFiatE   <- extractSecretKey (keysPath </> (fiatAdminName ++ ".skey"))  -- Get fiat admin's private key
-      vkSellerE <- extractKey (keysPath </> (sellerName ++ ".vkey"))           -- Get seller's public key
+    (sellerName : sellPriceStr : lovelaceSoldStr : deadlineStr : _) -> do
+      vkSellerE <- extractKey (keysPath </> (sellerName ++ ".vkey"))  -- Get seller's public key
 
       let argsE = do
-            skFiat       <- skFiatE
             vkSeller     <- vkSellerE
             sellPrice    <- parseInteger sellPriceStr
             lovelaceSold <- parseInteger lovelaceSoldStr
             deadline     <- parseInteger deadlineStr
 
-            return (skFiat, vkSeller, sellPrice, lovelaceSold, deadline)
+            return (vkSeller, sellPrice, lovelaceSold, deadline)
 
       case argsE of
-        Right (skFiat, vkSeller, sellPrice, lovelaceSold, deadline) -> do
-          let vkFiat = toPublic skFiat
-
-          -- Fiat admin signs fiat payment info
-          let sig = sign skFiat vkFiat . fromBuiltin . dataToBlake . paymentInfoHashEx1 $ sellerName
-
-          let claimRedeemer = Claim . toBuiltin @BS.ByteString . BA.convert $ sig
-
+        Right (vkSeller, sellPrice, lovelaceSold, deadline) -> do
           BS.writeFile (assetsPath </> (sellerName ++ "SellDatum.cbor")) $ dataToCBOR $
             sellerOnRampDatum sellerName vkSeller sellPrice lovelaceSold deadline
 
-          BS.writeFile (assetsPath </> (sellerName ++ "PaymentInfoRedeemer.cbor")) $ dataToCBOR claimRedeemer
+          putStr $ "Wrote " ++ sellerName ++ "SellDatum.cbor\n\n"
 
         Left err -> error $ "parse error: " ++ show err
 
-    _ -> error "Error: expected five command-line arguments.\n"
+    _ -> error "Error: expected four command-line arguments.\n"

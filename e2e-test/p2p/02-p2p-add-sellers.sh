@@ -45,23 +45,24 @@ random_integer () {
 
 echo "Adding sellers..."
 
-# Arguments for cabal executable 'p2p-add-seller':
-# 1) Fiat administrator name
-# 2) Seller name
-# 3) Sell price
-# 4) Value sold (lovelace)
-# 5) Buy deadline
-
 sellPrice=$(random_integer 30 40)
 lovelaceSold=$(random_integer 30000000 40000000)
 barbaraAddr=$(cat $keypath/barbara.addr)
-deadline=$(($current_time + 60))  # giving one minute for buyer to decide to buy
+deadline=$(($current_time + 3))  # just adding 3 seconds to current time
 
 echo ""
 echo "Barbara sells $lovelaceSold lovelace..."
 echo ""
 
-cabal run p2p-add-seller -- "alice" "barbara" $sellPrice $lovelaceSold $deadline
+# Arguments for cabal executable 'p2p-add-seller':
+# 1) Seller name
+# 2) Sell price
+# 3) Value sold (lovelace)
+# 4) Buy deadline
+
+cabal run p2p-add-seller -- "barbara" $sellPrice $lovelaceSold $deadline
+
+echo "Sending Barbara's sell offer UTxO..."
 
 in1=$(cardano-cli conway query utxo --address $(cat $keypath/barbara.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 
@@ -94,7 +95,9 @@ echo ""
 echo "Bob sells $lovelaceSold lovelace..."
 echo ""
 
-cabal run p2p-add-seller -- "alice" "bob" $sellPrice $lovelaceSold $deadline
+cabal run p2p-add-seller -- "bob" $sellPrice $lovelaceSold $deadline
+
+echo "Sending Bob's sell offer UTxO..."
 
 in2=$(cardano-cli conway query utxo --address $(cat $keypath/bob.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 
@@ -127,7 +130,9 @@ echo ""
 echo "Brandon sells $lovelaceSold lovelace..."
 echo ""
 
-cabal run p2p-add-seller -- "alice" "brandon" $sellPrice $lovelaceSold $deadline
+cabal run p2p-add-seller -- "brandon" $sellPrice $lovelaceSold $deadline
+
+echo "Sending Brandon's sell offer UTxO..."
 
 in3=$(cardano-cli conway query utxo --address $(cat $keypath/brandon.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 
@@ -148,3 +153,5 @@ cardano-cli conway transaction sign \
 cardano-cli conway transaction submit \
     --testnet-magic $mN \
     --tx-file $keypath/brandonSells.tx
+
+echo ""

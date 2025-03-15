@@ -30,8 +30,10 @@ echo "Initialization..."
 
 #--------------------------------- :create onRamp script: --------------------------------
 
+echo ""
+echo "Creating 'onRamp' script..."
+
 aliceAddress=$(cat $keypath/alice.addr)
-echo "alice address: $aliceAddress"
 
 cabal run p2p-init-transaction -- "alice" $aliceAddress
 
@@ -49,6 +51,9 @@ cardano-cli conway query protocol-parameters \
   --out-file $assets/protocol.json
 
 #---------------------------------- :initialize Barbara: ---------------------------------
+
+echo ""
+echo "Initializing sellers..."
 
 cardano-cli conway address key-gen \
   --verification-key-file $keypath/barbara.vkey \
@@ -89,6 +94,9 @@ brandonAddress=$(cat $keypath/brandon.addr)
 
 #---------------------------------- :initialize Charlie: ---------------------------------
 
+echo ""
+echo "Initializing buyer..."
+
 cardano-cli conway address key-gen \
   --verification-key-file $keypath/charlie.vkey \
   --signing-key-file $keypath/charlie.skey
@@ -102,8 +110,8 @@ charlieAddress=$(cat $keypath/charlie.addr)
 
 #---------------------------- :fund other wallets: -----------------------------
 
-echo "Funding Barbara, Bob, Brandon and Charlie..."
 echo ""
+echo "Funding wallets..."
 
 funds1=100000000  # 100 ADA
 funds2=10000000   #  10 ADA

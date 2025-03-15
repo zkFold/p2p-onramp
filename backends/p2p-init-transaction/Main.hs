@@ -45,7 +45,6 @@ main = do
 
   case argsRaw of
     (fiatAdminName : feeAddrStr : _) -> do
-
       vkE <- extractKey (keysPath </> (fiatAdminName ++ ".vkey"))
 
       let paramsE = do
@@ -61,8 +60,8 @@ main = do
 
           BS.writeFile (assetsPath </> "cancel.cbor") $ dataToCBOR Cancel
 
-          putStr "\nDone serializing plutus script.\n\n"
+          putStr "\nDone serializing plutus script.\n"
 
         Left err -> error $ "parse error: " ++ show err
 
-    _ -> error "Error: please provide two command-line arguments.\n"
+    _ -> error "Error: please provide a pair of command-line arguments.\n"

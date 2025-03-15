@@ -8,7 +8,7 @@ import qualified Data.ByteString.Char8         as B8
 import           PlutusLedgerApi.V3            as V3
 import           PlutusTx.Prelude              (verifyEd25519Signature)
 import           Prelude                       (Either (..), IO, Maybe (..),
-                                                error, print, putStrLn, return,
+                                                error, print, putStr, return,
                                                 ($), (++), (.))
 import           System.Directory              (getCurrentDirectory)
 import           System.Environment            (getArgs)
@@ -55,13 +55,15 @@ main = do
 
           let nextDat = prevDat { buyerPubKeyHash = Just buyerPkh }
 
+          putStr "\nSeller signs datum updated with buyer's pub-key-hash...\n\n"
+
           let sig            = sign sk vk . fromBuiltin $ dataToBlake nextDat
               updateRedeemer = Update . toBuiltin @BS.ByteString . BA.convert $ sig
 
-          putStrLn "\nVerifies signature:"
+          putStr "Verifies signature:\n"
           print $ verifyEd25519Signature (toBuiltin @BS.ByteString . BA.convert $ vk) (dataToBlake nextDat) (toBuiltin @BS.ByteString . BA.convert $ sig)
 
-          putStrLn $ "\nSignature: " ++ B8.unpack (B16.encode . BA.convert $ sig)
+          putStr $ "\nSignature: " ++ B8.unpack (B16.encode . BA.convert $ sig) ++ "\n"
 
           BS.writeFile (assetsPath </> (buyerName ++ "BoughtDatum.cbor")) $ dataToCBOR nextDat
           BS.writeFile (assetsPath </> (sellerName ++ "SoldRedeemer.cbor")) $ dataToCBOR updateRedeemer
