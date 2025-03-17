@@ -32,14 +32,14 @@ main = do
   argsRaw <- getArgs
 
   case argsRaw of
-    (fiatAdminName : sellerName : _) -> do
-      skFiatE   <- extractSecretKey (keysPath </> (fiatAdminName ++ ".skey"))  -- Get fiat admin's private key
+    (fiatWitnessName : sellerName : _) -> do
+      skFiatE   <- extractSecretKey (keysPath </> (fiatWitnessName ++ ".skey"))  -- Get fiat witness' private key
 
       case skFiatE of
         Right skFiat -> do
           let vkFiat = toPublic skFiat
 
-          putStr "\nFiat admin signs hash of fiat payment info...\n\n"
+          putStr "\nFiat witness signs hash of fiat payment info...\n\n"
 
           let infoHash = paymentInfoHashEx1 sellerName
               sig = sign skFiat vkFiat . fromBuiltin . dataToBlake $ infoHash
