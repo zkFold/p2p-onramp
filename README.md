@@ -15,6 +15,10 @@ To reproduce the buy/sell trading sequence, execute:
 - `./p2p/01-p2p-init-transaction.sh`  serializes the `onRamp` plutus script and initializes the seller's and buyer's wallets.
 - `./p2p/02-p2p-add-sellers.sh`  adds sell offers to the onRamp script.
 - `./p2p/03-p2p-buy-order.sh`  selects a "best" offer and updates the corresponding datum with a buy order.
-- `./p2p/04-p2p-claim-transaction`  buyer claims the funds after fiat admin provides cryptographic proof.
+- `./p2p/04-p2p-claim-transaction`  buyer claims the funds after fiat witness provides cryptographic proof.
 - `./p2p/05-p2p-cancel-transaction.sh`  sellers whose orders were not executed can reclaim funds after deadline has passed.
 - `./p2p/reset.sh`  erases keys and assets to reset the system.
+
+## Documentation
+
+For details, see document [progress_report.pdf](https://github.com/zkFold/p2p-onramp/raw/main/progress_report.pdf).
