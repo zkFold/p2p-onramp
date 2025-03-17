@@ -85,8 +85,9 @@ sellerOut=$(cat $assets/sellChoiceOref.txt)
 
 identify_selected_seller_name "$sellerOut"    # Identify name of selected seller
 sellerName=$(cat $assets/sellChoiceName.txt)
+sellerNameCap=$(echo $sellerName | sed -E 's/^(.)/\U\1/')
 
-echo "Selected seller: $(echo $sellerName | sed -E 's/^(.)/\U\1/')"
+echo "Selected seller: $sellerNameCap"
 
 sellerRedeemer="$assets/${sellerName}SoldRedeemer.cbor"
 sellerOutResolved=$(utxo_resolved $sellerOut)
