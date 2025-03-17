@@ -2,7 +2,7 @@ module ZkFold.Cardano.P2P.Example where
 
 import qualified Data.ByteString.Char8      as B8
 import           Data.Ratio                 ((%))
-import           PlutusLedgerApi.V1.Value   (Lovelace (..), lovelaceValueOf)
+import           PlutusLedgerApi.V1.Value   (lovelaceValueOf)
 import           PlutusLedgerApi.V3
 import           PlutusTx.Prelude
 import           Prelude                    (String)
