@@ -10,18 +10,20 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 index-state:
-  , hackage.haskell.org 2024-10-03T19:52:39Z
-  , cardano-haskell-packages 2024-10-03T15:13:19Z
+  , hackage.haskell.org 2025-01-13T01:23:22Z
+  , cardano-haskell-packages 2025-01-08T16:35:32Z
 
 source-repository-package
   type: git
-  location: https://github.com/zkFold/zkfold-base.git
-  tag: 45b90cdc4a5befe6fd59525b10b2fdc3116dd18f
+  location: https://github.com/zkFold/symbolic.git
+  tag: 840c2024a0368c1147cf5074c759de5cd51c85a6
+  subdir: symbolic-base
 
 source-repository-package
   type: git
   location: https://github.com/zkFold/zkfold-cardano.git
-  tag: 2f49fa86559380d9bbe16497dbe509c546bf353f
+  tag: aff430f103cb3a674fadfd48ed8ea962482ce236
+  subdir: zkfold-cardano
 
 packages: .
 

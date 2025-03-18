@@ -8,6 +8,7 @@ cabal-dev
 *.chs.h
 *.dyn_o
 *.dyn_hi
+*~
 .hpc
 .hsenv
 .cabal-sandbox/
@@ -21,3 +22,8 @@ cabal.project.local
 cabal.project.local~
 .HTF/
 .ghc.environment.*
+logs
+assets
+e2e-test/local-testnet/example/
+e2e-test/*/keys
+e2e-test/*/priv

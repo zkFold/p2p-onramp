@@ -1,0 +1,97 @@
+#! /bin/bash
+
+set -e
+# Unofficial bash strict mode.
+# See: http://redsymbol.net/articles/unofficial-bash-strict-mode/
+set -u
+set -o pipefail
+
+sanchomagic=4
+assets=../assets
+keypath=./p2p/keys
+privpath=./p2p/priv
+
+mN=$(cat $privpath/testnet.flag)
+
+# Wait time (in seconds) before querying blockchain
+if [ $mN == $sanchomagic ]; then
+    pause=7
+    inv_slot_length=1    
+else
+    pause=4
+    inv_slot_length=10
+fi
+
+onRampAddr=$(cat $keypath/onRamp.addr)
+onRampPlutus=$assets/onRamp.plutus
+
+sellerName=$(cat $assets/sellChoiceName.txt)
+
+cabal run p2p-claim-transaction -- "alice" "$sellerName"
+
+charlieAddr=$(cat $keypath/charlie.addr)
+charlieRedeemer="$assets/${sellerName}PaymentInfoRedeemer.cbor"
+charlieOrderOut=$(cardano-cli conway transaction txid --tx-file "$keypath/charlieBuys.tx")#0
+
+feeAddr=$(cat $keypath/alice.addr)
+feeValue=3000000
+
+#-------------------------------- :claim tx: ----------------------------------
+
+in1=$(cardano-cli conway query utxo --address $(cat $keypath/charlie.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
+collateral=$in1
+
+isCharlieOrderUnspent=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
+			    jq -r --arg key "$charlieOrderOut" 'has($key) | tostring')
+
+if [ $isCharlieOrderUnspent == "false" ]; then
+    echo ""
+    echo "Buyer has already claimed."
+    echo ""
+else
+    echo ""
+    echo "Claim transaction..."
+
+    charlieOrderOutResolved=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
+				  jq -r --arg key "$charlieOrderOut" '.[$key]')
+    charlieLovelace=$(cardano-cli conway query utxo --address $(cat $keypath/onRamp.addr) --testnet-magic $mN --out-file /dev/stdout |
+			  jq -r --arg key "$charlieOrderOut" '.[$key].value.lovelace')
+
+    cardano-cli conway transaction build \
+	--testnet-magic $mN \
+	--tx-in $in1 \
+	--tx-in $charlieOrderOut \
+	--tx-in-script-file $onRampPlutus \
+	--tx-in-inline-datum-present \
+	--tx-in-redeemer-cbor-file $charlieRedeemer \
+	--tx-in-collateral $collateral \
+	--tx-out "$charlieAddr + $charlieLovelace lovelace" \
+	--tx-out "$feeAddr + $feeValue lovelace" \
+	--change-address $(cat $keypath/charlie.addr) \
+	--out-file $keypath/charlieBought.txbody
+
+	cardano-cli conway transaction sign \
+	    --testnet-magic $mN \
+	    --tx-body-file $keypath/charlieBought.txbody \
+	    --signing-key-file $keypath/charlie.skey \
+	    --out-file $keypath/charlieBought.tx
+
+	cardano-cli conway transaction submit \
+	    --testnet-magic $mN \
+	    --tx-file $keypath/charlieBought.tx
+
+    boughtTx=$(cardano-cli conway transaction txid --tx-file "$keypath/charlieBought.tx")
+    boughtOut=$boughtTx#0
+    while true; do
+	txOnChain=$(cardano-cli conway query utxo --address $charlieAddr --testnet-magic $mN --out-file /dev/stdout | jq -r --arg key "$boughtOut" 'has($key) | tostring')
+	if [ $txOnChain == "false" ]; then
+	    echo "Waiting to see claim tx onchain..."
+	    sleep $pause
+	else
+	    echo ""
+	    echo "Transaction Id: $boughtTx"
+	    echo ""
+	    break
+	fi
+    done
+fi
