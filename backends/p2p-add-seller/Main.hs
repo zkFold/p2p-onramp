@@ -17,14 +17,14 @@ import           ZkFold.Cardano.Parse.Utils    (parseInteger)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
 
 
-sellerOnRampDatum :: String -> BS.ByteString -> Integer -> Integer  -> Integer -> OnRampDatum
-sellerOnRampDatum sellerName sellerPubKey sellPrice lovelaceSold deadline =
+sellerOnRampDatum :: String -> BS.ByteString -> Integer -> Integer  -> OnRampDatum
+sellerOnRampDatum sellerName sellerPubKey sellPrice lovelaceSold =
   OnRampDatum { paymentInfoHash   = paymentInfoHashEx1 sellerName
               , sellPriceUsd      = sellPrice
               , valueSold         = lovelaceValue . Lovelace $ lovelaceSold
               , sellerPubKeyBytes = toBuiltin sellerPubKey
               , buyerPubKeyHash   = Nothing
-              , timelock          = Just $ POSIXTime deadline
+              , timelock          = Nothing
               }
 
 main :: IO ()
@@ -43,24 +43,23 @@ main = do
   argsRaw <- getArgs
 
   case argsRaw of
-    (sellerName : sellPriceStr : lovelaceSoldStr : deadlineStr : _) -> do
+    (sellerName : sellPriceStr : lovelaceSoldStr : _) -> do
       vkSellerE <- extractKey (keysPath </> (sellerName ++ ".vkey"))  -- Get seller's public key
 
       let argsE = do
             vkSeller     <- vkSellerE
             sellPrice    <- parseInteger sellPriceStr
             lovelaceSold <- parseInteger lovelaceSoldStr
-            deadline     <- parseInteger deadlineStr
 
-            return (vkSeller, sellPrice, lovelaceSold, deadline)
+            return (vkSeller, sellPrice, lovelaceSold)
 
       case argsE of
-        Right (vkSeller, sellPrice, lovelaceSold, deadline) -> do
+        Right (vkSeller, sellPrice, lovelaceSold) -> do
           BS.writeFile (assetsPath </> (sellerName ++ "SellDatum.cbor")) $ dataToCBOR $
-            sellerOnRampDatum sellerName vkSeller sellPrice lovelaceSold deadline
+            sellerOnRampDatum sellerName vkSeller sellPrice lovelaceSold
 
           putStr $ "Wrote " ++ sellerName ++ "SellDatum.cbor\n\n"
 
         Left err -> error $ "parse error: " ++ show err
 
-    _ -> error "Error: expected four command-line arguments.\n"
+    _ -> error "Error: expected three command-line arguments.\n"

@@ -17,7 +17,7 @@ import           System.FilePath               (takeFileName, (</>))
 import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToCBOR, parseAddress)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
-import           ZkFold.Cardano.Parse.Utils    (parseOnRampDatum)
+import           ZkFold.Cardano.Parse.Utils    (parseInteger, parseOnRampDatum)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..),
                                                 OnRampRedeemer (..))
 
@@ -36,8 +36,8 @@ main = do
   argsRaw <- getArgs
 
   case argsRaw of
-    (buyerName : buyerAddrStr : sellerName : sellerUtxoStr : _) -> do
-      skE <- extractSecretKey (keysPath </> (sellerName ++ ".skey"))
+    (buyerName : buyerAddrStr : sellerName : sellerUtxoStr : deadlineStr : _) -> do
+      skE <- extractSecretKey (keysPath </> (sellerName ++ ".skey"))  -- Get seller's private key
 
       let paramsE = do
             sk        <- skE
@@ -46,16 +46,18 @@ main = do
                            PubKeyCredential pkh -> Right pkh
                            _                    -> Left "Expected 'PubKeyCredential'"
             prevDat   <- parseOnRampDatum sellerUtxoStr
+            deadline  <- parseInteger deadlineStr
 
-            return (sk, buyerPkh, prevDat)
+            return (sk, buyerPkh, prevDat, deadline)
 
       case paramsE of
-        Right (sk, buyerPkh, prevDat) -> do
+        Right (sk, buyerPkh, prevDat, deadline) -> do
           let vk = toPublic sk
 
-          let nextDat = prevDat { buyerPubKeyHash = Just buyerPkh }
+          let nextDat = prevDat { buyerPubKeyHash = Just buyerPkh
+                                , timelock        = Just $ POSIXTime deadline }
 
-          putStr "\nSeller signs datum updated with buyer's pub-key-hash...\n\n"
+          putStr "\nSeller signs datum updated with buyer's pub-key-hash and time-lock...\n\n"
 
           let sig            = sign sk vk . fromBuiltin $ dataToBlake nextDat
               updateRedeemer = Update . toBuiltin @BS.ByteString . BA.convert $ sig
@@ -73,4 +75,4 @@ main = do
 
         Left e                        -> error e
 
-    _ -> error "Please provide four command-line arguments.\n"
+    _ -> error "Please provide five command-line arguments.\n"

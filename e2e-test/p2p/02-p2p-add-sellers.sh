@@ -6,7 +6,7 @@ set -e
 set -u
 set -o pipefail
 
-sanchomagic=4
+previewmagic=2
 assets=../assets
 keypath=./p2p/keys
 privpath=./p2p/priv
@@ -14,7 +14,7 @@ privpath=./p2p/priv
 mN=$(cat $privpath/testnet.flag)
 
 # Wait time (in seconds) before querying blockchain
-if [ $mN == $sanchomagic ]; then
+if [ $mN == $previewmagic ]; then
     pause=7
     inv_slot_length=1    
 else
@@ -26,15 +26,6 @@ onRamp_addr=$(cat $keypath/onRamp.addr)
 seller_names_all=""
 
 #---------------------------------- :macros: -----------------------------------
-
-current_time=$(date +%s)
-current_slot=$(cardano-cli conway query tip --testnet-magic $mN | jq -r '.slot')
-system_start=$((current_time - current_slot/inv_slot_length))
-
-posix_to_slot () {
-    local posix_time=$1
-    echo $(( 10 * ($posix_time - $system_start) ))
-}
 
 random_integer () {
     local min=$1
@@ -49,20 +40,12 @@ add_seller () {
     local sell_price=$(random_integer 30 40)
     local lovelace_sold=$(random_integer 30000000 40000000)
     local seller_addr=$(cat $keypath/${seller_name}.addr)
-    local now=$(date +%s)
-    local deadline=$((now + 60))  # adding one minute to current time
 
     echo ""
     echo "$seller_name_cap sells $lovelace_sold lovelace..."
     echo ""
 
-    # Arguments for cabal executable 'p2p-add-seller':
-    # 1) Seller name
-    # 2) Sell price
-    # 3) Value sold (lovelace)
-    # 4) Buy deadline
-
-    cabal run p2p-add-seller -- $seller_name $sell_price $lovelace_sold $deadline
+    cabal run p2p-add-seller -- $seller_name $sell_price $lovelace_sold
 
     echo "Sending ${seller_name_cap}'s sell offer UTxO..."
 

@@ -6,7 +6,7 @@ set -e
 set -u
 set -o pipefail
 
-sanchomagic=4
+previewmagic=2
 assets=../assets
 keypath=./p2p/keys
 privpath=./p2p/priv
@@ -14,7 +14,7 @@ privpath=./p2p/priv
 mN=$(cat $privpath/testnet.flag)
 
 # Wait time (in seconds) before querying blockchain
-if [ $mN == $sanchomagic ]; then
+if [ $mN == $previewmagic ]; then
     pause=7
     inv_slot_length=1    
 else
@@ -34,7 +34,7 @@ system_start=$((current_time - current_slot/inv_slot_length))
 
 posix_to_slot () {
     local posix_time=$1
-    echo $(( 10 * ($posix_time - $system_start) ))
+    echo $(( inv_slot_length * (posix_time - system_start) ))
 }
 
 cancel_sell_order () {
@@ -59,8 +59,7 @@ cancel_sell_order () {
 
 	local now=$(date +%s)
 	local slot0=$(posix_to_slot $now)
-	local slot1=$(($slot0 - 5))
-	local slot2=$(($slot0 + 25))
+	local slot1=$(($slot0 - 30))
 
 	cardano-cli conway transaction build \
 	    --testnet-magic $mN \
@@ -73,7 +72,6 @@ cancel_sell_order () {
 	    --tx-out "$seller_addr + $sellerLovelace lovelace" \
 	    --change-address $seller_addr \
 	    --invalid-before $slot1 \
-	    --invalid-hereafter $slot2 \
 	    --out-file $keypath/${seller_name}Cancels.txbody
 
 	cardano-cli conway transaction sign \
@@ -97,3 +95,20 @@ echo "Cancel sell orders..."
 cancel_sell_order "barbara"
 cancel_sell_order "bob"
 cancel_sell_order "brandon"
+
+#--------------------------------- :epilogue: ----------------------------------
+
+echo ""
+
+while true; do
+    isCanceled=$(cardano-cli conway query utxo --address $onRampAddr --testnet-magic $mN --out-file /dev/stdout | jq -c '. == {}')
+    if [ $isCanceled == "false" ]; then
+	echo "Waiting to see all sell orders canceled onchain..."
+	sleep $pause
+    else
+	echo ""
+	echo "Done."
+	echo ""
+	break
+    fi
+done
