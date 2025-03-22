@@ -108,7 +108,7 @@ echo ""
 echo "Generating buyer's datum and redeemer..."
 
 now=$(date +%s)
-deadline=$(to_plutus_posix $((now + 300)))  # adding five minutes to current time  #DEBUG
+deadline=$(to_plutus_posix $((now + 300)))  # adding five minutes to current time
 
 cabal run p2p-buy-order -- "charlie" $charlieAddr $sellerName $sellerOutResolved $deadline
 
