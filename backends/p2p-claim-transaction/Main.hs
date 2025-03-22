@@ -53,6 +53,8 @@ main = do
 
           BS.writeFile (assetsPath </> (sellerName ++ "PaymentInfoRedeemer.cbor")) $ dataToCBOR claimRedeemer
 
+          putStr $ "\nWrote " ++ sellerName ++ "PaymentInfoRedeemer.cbor\n"
+
         Left err -> error $ "parse error: " ++ show err
 
     _ -> error "Error: expected a pair of command-line arguments.\n"

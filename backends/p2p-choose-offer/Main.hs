@@ -21,10 +21,8 @@ data OnRampUtxoKV = OnRampUtxoKV { oref :: String, resolved :: OnRampUtxo }
   deriving Show
 
 instance FromJSON OnRampUtxoKV where
-    parseJSON = withObject "OnRampUtxoKV" $ \obj -> do
-        oref     <- obj .: "key"
-        resolved <- obj .: "value"
-        return $ OnRampUtxoKV oref resolved
+  parseJSON = withObject "OnRampUtxoKV" $
+    \obj -> OnRampUtxoKV <$> obj .: "key" <*> obj .: "value"
 
 main :: IO ()
 main = do

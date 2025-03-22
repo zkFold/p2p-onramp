@@ -6,7 +6,7 @@ set -e
 set -u
 set -o pipefail
 
-sanchomagic=4
+previewmagic=2
 assets=../assets
 keypath=./p2p/keys
 privpath=./p2p/priv
@@ -14,12 +14,10 @@ privpath=./p2p/priv
 mN=$(cat $privpath/testnet.flag)
 
 # Wait time (in seconds) before querying blockchain
-if [ $mN == $sanchomagic ]; then
+if [ $mN == $previewmagic ]; then
     pause=7
-    inv_slot_length=1    
 else
     pause=4
-    inv_slot_length=10
 fi
 
 onRampAddr=$(cat $keypath/onRamp.addr)

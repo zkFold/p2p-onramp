@@ -6,7 +6,7 @@ set -e
 set -u
 set -o pipefail
 
-sanchomagic=4
+previewmagic=2
 assets=../assets
 keypath=./p2p/keys
 privpath=./p2p/priv
@@ -14,7 +14,7 @@ privpath=./p2p/priv
 mN=$(cat $privpath/testnet.flag)
 
 # Wait time (in seconds) before querying blockchain
-if [ $mN == $sanchomagic ]; then
+if [ $mN == $previewmagic ]; then
     pause=7
     inv_slot_length=1    
 else
@@ -36,7 +36,13 @@ system_start=$((current_time - current_slot/inv_slot_length))
 
 posix_to_slot () {
     local posix_time=$1
-    echo $(( 10 * ($posix_time - $system_start) ))
+    echo $(( inv_slot_length * (posix_time - system_start) ))
+}
+
+to_plutus_posix () {
+    local posix_time=$1
+    local plutus_posix_time=$(( 1000 * posix_time ))
+    echo $plutus_posix_time
 }
 
 utxo_resolved () {
@@ -78,12 +84,15 @@ echo ""
 echo "Choosing best sell offer..."
 echo ""
 
-onRampUtxos=$(cardano-cli conway query utxo --address $onRampAddr --testnet-magic $mN --out-file /dev/stdout | jq -c 'to_entries')
+if [ ! -f "$assets/sellChoiceOref.txt" ]; then
+    onRampUtxos=$(cardano-cli conway query utxo --address $onRampAddr --testnet-magic $mN --out-file /dev/stdout | jq -c 'to_entries')
 
-cabal run p2p-choose-offer -- "$onRampUtxos"  # Selects TxOutRef for best sell offer
+    cabal run p2p-choose-offer -- "$onRampUtxos"  # Selects TxOutRef for best sell offer
+fi
+
 sellerOut=$(cat $assets/sellChoiceOref.txt)
 
-identify_selected_seller_name "$sellerOut"    # Identify name of selected seller
+identify_selected_seller_name "$sellerOut"        # Identify name of selected seller
 sellerName=$(cat $assets/sellChoiceName.txt)
 sellerNameCap=$(echo $sellerName | sed -E 's/^(.)/\U\1/')
 
@@ -98,7 +107,10 @@ sellerLovelace=$(echo $sellerOutResolved | jq '.value.lovelace')
 echo ""
 echo "Generating buyer's datum and redeemer..."
 
-cabal run p2p-buy-order -- "charlie" $charlieAddr $sellerName $sellerOutResolved
+now=$(date +%s)
+deadline=$(to_plutus_posix $((now + 300)))  # adding five minutes to current time  #DEBUG
+
+cabal run p2p-buy-order -- "charlie" $charlieAddr $sellerName $sellerOutResolved $deadline
 
 echo ""
 echo "Buy-order transaction..."
@@ -106,11 +118,9 @@ echo "Buy-order transaction..."
 in1=$(cardano-cli conway query utxo --address $(cat $keypath/charlie.addr) --testnet-magic $mN --out-file /dev/stdout | jq -r 'keys[0]')
 collateral=$in1
 
-current_time=$(date +%s)
-current_slot=$(posix_to_slot $current_time)
-
-slot1=$(($current_slot - 5))
-slot2=$(($current_slot + 25))
+now=$(date +%s)
+slot0=$(posix_to_slot $now)
+slot2=$(($slot0 + 60))
 
 cardano-cli conway transaction build \
     --testnet-magic $mN \
@@ -123,7 +133,6 @@ cardano-cli conway transaction build \
     --tx-out "$onRampAddr + $sellerLovelace lovelace" \
     --tx-out-inline-datum-cbor-file $charlieDatum \
     --change-address $(cat $keypath/charlie.addr) \
-    --invalid-before $slot1 \
     --invalid-hereafter $slot2 \
     --out-file $keypath/charlieBuys.txbody
 

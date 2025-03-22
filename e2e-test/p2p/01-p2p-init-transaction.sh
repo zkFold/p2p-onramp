@@ -6,7 +6,7 @@ set -e
 set -u
 set -o pipefail
 
-sanchomagic=4
+previewmagic=2
 assets=../assets
 keypath=./p2p/keys
 privpath=./p2p/priv
@@ -16,7 +16,7 @@ mN=$(cat $privpath/testnet.flag)
 mkdir -p $assets
 
 # Wait time (in seconds) before querying blockchain
-if [ $mN == $sanchomagic ]; then
+if [ $mN == $previewmagic ]; then
     pause=7
 else
     pause=4
