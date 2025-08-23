@@ -7,8 +7,7 @@
 
 module Main where
 
-import           Crypto.PubKey.Ed25519        (PublicKey, SecretKey, sign,
-                                               toPublic)
+import           Crypto.PubKey.Ed25519        (SecretKey, generateSecretKey, sign, toPublic)
 import qualified Data.ByteArray               as BA
 import qualified Data.ByteString              as BS
 import qualified PlutusLedgerApi.V1.Value     as V1
@@ -16,11 +15,9 @@ import           PlutusLedgerApi.V3
 import           PlutusTx.AssocMap            (empty)
 import           PlutusTx.Prelude             hiding (pure, (<$>))
 import           Prelude                      (IO, Int, pure, (<$>))
-import qualified Prelude                      as P
 import           Test.Tasty                   (TestTree, defaultMain, testGroup)
 import           Test.Tasty.QuickCheck        as QC
 
-import           ZkFold.Cardano.Crypto.Utils  (bytesToSecretKey, stringToKey)
 import           ZkFold.Cardano.OnChain.Utils (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp
 
@@ -91,14 +88,6 @@ ownRef0 = TxOutRef "feedbeefcafecafe" 0
 genPosix :: Gen POSIXTime
 genPosix = POSIXTime <$> chooseInteger (0, 10_000_000)
 
-genRangeAround :: POSIXTime -> Gen POSIXTimeRange
-genRangeAround t = oneof
-  [ pure $ from t                                   -- [t, +inf)
-  , pure $ to (t - 1)                               -- (-inf, t-1]
-  , do dt <- POSIXTime <$> chooseInteger (1, 1000)
-       pure $ from (t - dt)                         -- [t-dt, +inf)
-  ]
-
 genRangeBefore :: POSIXTime -> Gen POSIXTimeRange
 genRangeBefore t = oneof
   [ pure $ to (t - 1)                                              -- (-inf, t-1]
@@ -152,50 +141,17 @@ setTimelock :: Maybe POSIXTime -> OnRampDatum -> OnRampDatum
 setTimelock mt d = d { timelock = mt }
 
 --------------------------------------------------------------------------------
--- Fiat admin's signature (fixed admin)
+-- Signing data
 --------------------------------------------------------------------------------
 
-fiatSkey :: SecretKey
-fiatSkey =
-  let hexStr = "5820db1e9d1781a4817ad6d4edb334547f442c34c8c6292e2ae2dce5c06dc002af8b"
-      skeyE  = stringToKey hexStr >>= bytesToSecretKey
-  in case skeyE of
-    Right skey -> skey
-    Left e     -> P.error e
+fromBA :: BA.ByteArrayAccess a => a -> BuiltinByteString
+fromBA = toBuiltin @BS.ByteString . BA.convert
 
-fiatVkey :: PublicKey
-fiatVkey = toPublic fiatSkey
-
-fiatVkeyBS :: BuiltinByteString
-fiatVkeyBS = toBuiltin @BS.ByteString . BA.convert $ fiatVkey
-
-signedInfo :: ToData a => a -> BuiltinByteString
-signedInfo dat = toBuiltin @BS.ByteString . BA.convert $ fiatSigBytes
+signedData :: ToData a => SecretKey -> a -> BuiltinByteString
+signedData skey dat = fromBA sigBytes
   where
-    fiatSigBytes = sign fiatSkey fiatVkey . fromBuiltin $ dataToBlake dat
-
---------------------------------------------------------------------------------
--- Seller's signature (fixed seller)
---------------------------------------------------------------------------------
-
-sellerSkey :: SecretKey
-sellerSkey =
-  let hexStr = "582099cd68b177166df67aac014b41e6ad2f99fa8d360aee09df755e1e84e3aeb1a2"
-      skeyE  = stringToKey hexStr >>= bytesToSecretKey
-  in case skeyE of
-    Right skey -> skey
-    Left e     -> P.error e
-
-sellerVkey :: PublicKey
-sellerVkey = toPublic sellerSkey
-
-sellerVkeyBS :: BuiltinByteString
-sellerVkeyBS = toBuiltin @BS.ByteString . BA.convert $ sellerVkey
-
-signedData :: ToData a => a -> BuiltinByteString
-signedData dat = toBuiltin @BS.ByteString . BA.convert $ sellerSigBytes
-  where
-    sellerSigBytes = sign sellerSkey sellerVkey . fromBuiltin $ dataToBlake dat
+    vkey = toPublic skey
+    sigBytes = sign skey vkey . fromBuiltin $ dataToBlake dat
 
 --------------------------------------------------------------------------------
 -- UPDATE properties (negative/safety ones that don't require a valid signature)
@@ -210,16 +166,18 @@ prop_Update_accepts_on_buyer_addition =
   forAll genPosix  $ \tNow ->
   forAll (genRangeBefore tNow) $ \vr ->
   forAll genPKH    $ \buyer ->
-  let
-    d0'       = d0 { sellerPubKeyBytes = sellerVkeyBS }
-    d1        = setTimelock (Just tNow) $ setBuyer buyer d0'
-    inOut     = outWithDatum scriptAddr v d0'
-    out1_good = outWithDatum scriptAddr v d1
-    ctx       = mkCtx ownRef0 inOut [out1_good] vr
-    sellerSig = signedData d1
-  in
-    counterexample "Update should succeed on correct buyer & timelock addition" $
-      onRamp p (Update sellerSig) ctx === True
+  ioProperty $ do
+    sellerSkey <- generateSecretKey
+    let sellerVkeyBS = fromBA $ toPublic sellerSkey
+        d0'           = d0 { sellerPubKeyBytes = sellerVkeyBS }
+        d1            = setTimelock (Just tNow) $ setBuyer buyer d0'
+        inOut         = outWithDatum scriptAddr v d0'
+        out1_good     = outWithDatum scriptAddr v d1
+        ctx           = mkCtx ownRef0 inOut [out1_good] vr
+        sellerSig     = signedData sellerSkey d1
+    pure $
+      counterexample "Update should succeed on correct buyer & timelock addition" $
+        onRamp p (Update sellerSig) ctx === True
 
 -- If current datum already has a buyer, Update must fail.
 prop_Update_rejects_when_buyer_already_set :: Property
@@ -230,17 +188,19 @@ prop_Update_rejects_when_buyer_already_set =
   forAll genPosix  $ \tNow ->
   forAll (genRangeBefore tNow) $ \vr ->
   forAll genPKH    $ \buyer ->
-  let
-    d0'       = d0 { sellerPubKeyBytes = sellerVkeyBS }
-    d0''      = setBuyer buyer d0'  -- current datum already has buyer
-    d1        = setTimelock (Just tNow) $ setBuyer buyer d0'
-    inOut     = outWithDatum scriptAddr v d0''
-    out1_good = outWithDatum scriptAddr v d1
-    ctx       = mkCtx ownRef0 inOut [out1_good] vr
-    sellerSig = signedData d1
-  in
-    counterexample "Update should fail if current datum already has a buyer" $
-      onRamp p (Update sellerSig) ctx === False
+  ioProperty $ do
+    sellerSkey <- generateSecretKey
+    let sellerVkeyBS = fromBA $ toPublic sellerSkey
+        d0'          = d0 { sellerPubKeyBytes = sellerVkeyBS }
+        d0''         = setBuyer buyer d0'  -- current datum already has buyer
+        d1           = setTimelock (Just tNow) $ setBuyer buyer d0'
+        inOut        = outWithDatum scriptAddr v d0''
+        out1_good    = outWithDatum scriptAddr v d1
+        ctx          = mkCtx ownRef0 inOut [out1_good] vr
+        sellerSig    = signedData sellerSkey d1
+    pure $
+      counterexample "Update should fail if current datum already has a buyer" $
+        onRamp p (Update sellerSig) ctx === False
 
 -- Any change to immutable fields between dat and dat' must fail.
 prop_Update_rejects_on_immutable_mutation :: Property
@@ -251,18 +211,20 @@ prop_Update_rejects_on_immutable_mutation =
   forAll genPosix  $ \tNow ->
   forAll (genRangeBefore tNow) $ \vr ->
   forAll genPKH    $ \buyer ->
-  let
-    d0'       = d0 { sellerPubKeyBytes = sellerVkeyBS }
-    d1        = setTimelock (Just tNow) $ setBuyer buyer d0'
-    -- ToDo: can fuzz other fields similarly
-    d1'       = d1 { paymentInfoHash = "MUTATED\NULHASH\NUL" }
-    inOut     = outWithDatum scriptAddr v d0'
-    out1_bad  = outWithDatum scriptAddr v d1'
-    ctxBad    = mkCtx ownRef0 inOut [out1_bad] vr
-    sellerSig = signedData d1'
-  in
-    counterexample "Update should fail if paymentInfoHash changes" $
-      onRamp p (Update sellerSig) ctxBad === False
+  ioProperty $ do
+    sellerSkey <- generateSecretKey
+    let sellerVkeyBS = fromBA $ toPublic sellerSkey
+        d0'       = d0 { sellerPubKeyBytes = sellerVkeyBS }
+        d1        = setTimelock (Just tNow) $ setBuyer buyer d0'
+        -- ToDo: can fuzz other fields similarly
+        d1'       = d1 { paymentInfoHash = "MUTATED\NULHASH\NUL" }
+        inOut     = outWithDatum scriptAddr v d0'
+        out1_bad  = outWithDatum scriptAddr v d1'
+        ctxBad    = mkCtx ownRef0 inOut [out1_bad] vr
+        sellerSig = signedData sellerSkey d1'
+    pure $
+      counterexample "Update should fail if paymentInfoHash changes" $
+        onRamp p (Update sellerSig) ctxBad === False
 
 -- If timelock for the *next* datum isn't strictly in the future, Update must fail.
 prop_Update_rejects_when_timelock_not_future :: Property
@@ -272,18 +234,20 @@ prop_Update_rejects_when_timelock_not_future =
   forAll genValue  $ \v ->
   forAll genPosix  $ \tNow ->
   forAll genPKH    $ \buyer ->
-  let
-    d0'       = d0 { sellerPubKeyBytes = sellerVkeyBS }
-    d1_bad    = setTimelock (Just tNow) $ setBuyer buyer d0'
-    inOut     = outWithDatum scriptAddr v d0'
-    out1_good = outWithDatum scriptAddr v d1_bad
-    -- Valid range that *starts* at tNow: 'after' will be False when equal boundary
-    vr        = from tNow
-    ctx       = mkCtx ownRef0 inOut [out1_good] vr
-    sellerSig = signedData d1_bad
-  in
-    counterexample "Update should fail if timelock is not strictly after validRange" $
-      onRamp p (Update sellerSig) ctx === False
+  ioProperty $ do
+    sellerSkey <- generateSecretKey
+    let sellerVkeyBS = fromBA $ toPublic sellerSkey
+        d0'       = d0 { sellerPubKeyBytes = sellerVkeyBS }
+        d1_bad    = setTimelock (Just tNow) $ setBuyer buyer d0'
+        inOut     = outWithDatum scriptAddr v d0'
+        out1_good = outWithDatum scriptAddr v d1_bad
+        -- Valid range that *starts* at tNow: 'after' will be False when equal boundary
+        vr        = from tNow
+        ctx       = mkCtx ownRef0 inOut [out1_good] vr
+        sellerSig = signedData sellerSkey d1_bad
+    pure $
+      counterexample "Update should fail if timelock is not strictly after validRange" $
+        onRamp p (Update sellerSig) ctx === False
 
 --------------------------------------------------------------------------------
 -- CANCEL properties
@@ -314,7 +278,7 @@ prop_Cancel_rejects_before_timelock_expires =
   forAll genValue  $ \v ->
   forAll genPosix  $ \tNow ->
   let
-    d0 = setTimelock (Just (tNow + 10_000)) d0_raw -- in the future
+    d0 = setTimelock (Just (tNow + 10_000)) d0_raw  -- in the future
     sellerPkh = PubKeyHash (blake2b_224 (sellerPubKeyBytes d0))
     inOut = outWithDatum scriptAddr v d0
     refund = payOut (pkhAddr sellerPkh) v
@@ -357,17 +321,19 @@ prop_Claim_accepts_normal_claim =
   forAll genValue  $ \v ->
   forAll genPosix  $ \tPast ->
   forAll genPKH    $ \buyer ->
-  let
-    p'       = p { fiatPubKeyBytes = fiatVkeyBS }
-    d0'      = setBuyer buyer d0
-    inOut    = outWithDatum scriptAddr v d0'
-    outBuyer = payOut (pkhAddr buyer) v
-    outFee   = payOut (feeAddress p') (feeValue p')
-    ctx      = mkCtx ownRef0 inOut [outBuyer, outFee] (from tPast)
-    fiatSig  = signedInfo $ paymentInfoHash d0'
-  in
-    counterexample "Normal claim should succeed" $
-      onRamp p' (Claim fiatSig) ctx === True
+  ioProperty $ do
+    fiatSkey <- generateSecretKey
+    let fiatVkeyBS = fromBA $ toPublic fiatSkey
+        p'          = p { fiatPubKeyBytes = fiatVkeyBS }
+        d0'         = setBuyer buyer d0
+        inOut       = outWithDatum scriptAddr v d0'
+        outBuyer    = payOut (pkhAddr buyer) v
+        outFee      = payOut (feeAddress p') (feeValue p')
+        ctx         = mkCtx ownRef0 inOut [outBuyer, outFee] (from tPast)
+        fiatSig     = signedData fiatSkey $ paymentInfoHash d0'
+    pure $
+      counterexample "Normal claim should succeed" $
+        onRamp p' (Claim fiatSig) ctx === True
 
 -- Claim must fail if no buyer is set
 prop_Claim_rejects_without_buyer :: Property
@@ -376,18 +342,20 @@ prop_Claim_rejects_without_buyer =
   forAll (setNoBuyer <$> genDatum) $ \d0 ->
   forAll genValue  $ \v ->
   forAll genPosix  $ \tPast ->
-  let
-    p'       = p { fiatPubKeyBytes = fiatVkeyBS }
-    inOut    = outWithDatum scriptAddr v d0
-    -- Outputs shaped as if correct, but buyer is Nothing so it must fail
-    dummyBuyer = PubKeyHash "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    outBuyer = payOut (pkhAddr dummyBuyer) v
-    outFee   = payOut (feeAddress p') (feeValue p')
-    ctx      = mkCtx ownRef0 inOut [outBuyer, outFee] (from tPast)
-    fiatSig  = signedInfo $ paymentInfoHash d0
-  in
-    counterexample "Claim should fail if buyerPubKeyHash is Nothing" $
-      onRamp p' (Claim fiatSig) ctx === False
+  ioProperty $ do
+    fiatSkey <- generateSecretKey
+    let fiatVkeyBS = fromBA $ toPublic fiatSkey
+        p'       = p { fiatPubKeyBytes = fiatVkeyBS }
+        inOut    = outWithDatum scriptAddr v d0
+        -- Outputs shaped as if correct, but buyer is Nothing so it must fail
+        dummyBuyer = PubKeyHash "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        outBuyer = payOut (pkhAddr dummyBuyer) v
+        outFee   = payOut (feeAddress p') (feeValue p')
+        ctx      = mkCtx ownRef0 inOut [outBuyer, outFee] (from tPast)
+        fiatSig  = signedData fiatSkey $ paymentInfoHash d0
+    pure $
+      counterexample "Claim should fail if buyerPubKeyHash is Nothing" $
+        onRamp p' (Claim fiatSig) ctx === False
 
 -- Wrong fee address or value must fail
 prop_Claim_rejects_wrong_fee :: Property
@@ -397,19 +365,21 @@ prop_Claim_rejects_wrong_fee =
   forAll genValue  $ \v ->
   forAll genPosix  $ \tPast ->
   forAll genPKH    $ \buyer ->
-  let
-    p'       = p { fiatPubKeyBytes = fiatVkeyBS }
-    -- Use a different fee address
-    pBad     = p' { feeAddress = Address (ScriptCredential (ScriptHash "notfee000000000000000000000000")) Nothing }
-    d0'      = setBuyer buyer d0
-    inOut    = outWithDatum scriptAddr v d0'
-    outBuyer = payOut (pkhAddr buyer) v
-    outFee   = payOut (feeAddress p') (feeValue p')
-    ctx      = mkCtx ownRef0 inOut [outBuyer, outFee] (from tPast)
-    fiatSig  = signedInfo $ paymentInfoHash d0'
-  in
-    counterexample "Claim should fail if fee address is wrong" $
-      onRamp pBad (Claim fiatSig) ctx === False
+  ioProperty $ do
+    fiatSkey <- generateSecretKey
+    let fiatVkeyBS = fromBA $ toPublic fiatSkey
+        p'       = p { fiatPubKeyBytes = fiatVkeyBS }
+        -- Use a different fee address
+        pBad     = p' { feeAddress = Address (ScriptCredential (ScriptHash "notfee000000000000000000000000")) Nothing }
+        d0'      = setBuyer buyer d0
+        inOut    = outWithDatum scriptAddr v d0'
+        outBuyer = payOut (pkhAddr buyer) v
+        outFee   = payOut (feeAddress p') (feeValue p')
+        ctx      = mkCtx ownRef0 inOut [outBuyer, outFee] (from tPast)
+        fiatSig  = signedData fiatSkey $ paymentInfoHash d0'
+    pure $
+      counterexample "Claim should fail if fee address is wrong" $
+        onRamp pBad (Claim fiatSig) ctx === False
 
 --------------------------------------------------------------------------------
 -- Main
