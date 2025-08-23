@@ -7,21 +7,22 @@
 
 module Main where
 
-import           Crypto.PubKey.Ed25519      (PublicKey, SecretKey, toPublic, sign)
-import qualified Data.ByteArray             as BA
-import qualified Data.ByteString            as BS
+import           Crypto.PubKey.Ed25519        (PublicKey, SecretKey, sign,
+                                               toPublic)
+import qualified Data.ByteArray               as BA
+import qualified Data.ByteString              as BS
+import qualified PlutusLedgerApi.V1.Value     as V1
 import           PlutusLedgerApi.V3
-import qualified PlutusLedgerApi.V1.Value   as V1
-import           PlutusTx.AssocMap          (empty)
-import           PlutusTx.Prelude           hiding (pure, (<$>))
-import           Prelude                    (IO, Int, pure, (<$>))
-import qualified Prelude                    as P
-import           Test.Tasty                 (defaultMain, testGroup, TestTree)
-import           Test.Tasty.QuickCheck      as QC
+import           PlutusTx.AssocMap            (empty)
+import           PlutusTx.Prelude             hiding (pure, (<$>))
+import           Prelude                      (IO, Int, pure, (<$>))
+import qualified Prelude                      as P
+import           Test.Tasty                   (TestTree, defaultMain, testGroup)
+import           Test.Tasty.QuickCheck        as QC
 
-import           ZkFold.Cardano.UPLC.OnRamp
 import           ZkFold.Cardano.Crypto.Utils  (bytesToSecretKey, stringToKey)
 import           ZkFold.Cardano.OnChain.Utils (dataToBlake)
+import           ZkFold.Cardano.UPLC.OnRamp
 
 --------------------------------------------------------------------------------
 -- Builders
@@ -277,7 +278,7 @@ prop_Update_rejects_when_timelock_not_future =
     inOut     = outWithDatum scriptAddr v d0'
     out1_good = outWithDatum scriptAddr v d1_bad
     -- Valid range that *starts* at tNow: 'after' will be False when equal boundary
-    vr        = from tNow    
+    vr        = from tNow
     ctx       = mkCtx ownRef0 inOut [out1_good] vr
     sellerSig = signedData d1_bad
   in
