@@ -7,7 +7,8 @@
 
 module Main where
 
-import           Crypto.PubKey.Ed25519        (SecretKey, generateSecretKey, sign, toPublic)
+import           Crypto.PubKey.Ed25519        (SecretKey, generateSecretKey,
+                                               sign, toPublic)
 import qualified Data.ByteArray               as BA
 import qualified Data.ByteString              as BS
 import qualified PlutusLedgerApi.V1.Value     as V1
