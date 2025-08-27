@@ -55,9 +55,9 @@ toPlutusValue val =
   where
     convertAsset (AdaAssetId, Quantity q) =
         singleton adaSymbol adaToken q
-    convertAsset (AssetId policyId assetName, Quantity q) =
+    convertAsset (AssetId policyId' assetName, Quantity q) =
         singleton
-            (CurrencySymbol . toBuiltin . serialiseToRawBytes $ policyId)
+            (CurrencySymbol . toBuiltin . serialiseToRawBytes $ policyId')
             (TokenName . toBuiltin . serialiseToRawBytes $ assetName)
             q
 
