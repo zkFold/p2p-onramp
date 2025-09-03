@@ -13,17 +13,24 @@ import           Data.Text                    (Text)
 import           P2POnRamp.Api.Context        (Ctx (..), OwnPubKeyBytes,
                                                OwnAddresses, UnsignedTxResponse,
                                                handleOwnAddr)
-import           P2POnRamp.Api.Seller         (SignRequest, verifyH)
+import           P2POnRamp.Api.Addr           (handleGetOnRampAddr)
+import           P2POnRamp.Api.Seller         (SellerOK, handleMessage, handleSigned, SellerData, handleSellerData, NewOrder)
 
 -- | Type for our Servant API.
-type API = "verify" :> ReqBody '[JSON] SignRequest
-                    :> Post    '[PlainText] Text
+type API = "message" :> Get '[PlainText] Text
+      :<|> "signed" :> ReqBody '[JSON] SellerOK
+                    :> Post '[JSON] SellerOK
+      :<|> "seller-data" :> ReqBody '[JSON] SellerData
+                         :> Post '[JSON] NewOrder
+      :<|> "onramp-addr" :> Get '[PlainText] Text
       :<|> "own-addr" :> ReqBody '[JSON] OwnAddresses
                       :> Post    '[JSON] OwnPubKeyBytes
 
 -- | Server Handler
 server :: Ctx -> FilePath -> ServerT API IO
-server _ _ = verifyH
+server ctx path = handleMessage :<|> handleSigned
+        :<|> handleSellerData path
+        :<|> handleGetOnRampAddr ctx
         :<|> handleOwnAddr
 
 appApi :: Proxy API

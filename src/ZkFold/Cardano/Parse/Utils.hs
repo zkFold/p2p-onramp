@@ -25,7 +25,7 @@ data OnRampUtxo = OnRampUtxo { address         :: String
                              } deriving stock (Generic, Show)
                                deriving anyclass FromJSON
 
------ PARSE 'OnRampDatum' -----
+----- :PARSE 'OnRampDatum': -----
 
 newtype OnRampDatumJSON = OnRampDatumJSON OnRampDatum
   deriving stock Show
@@ -47,7 +47,7 @@ parseOnRampDatum :: String -> Either String OnRampDatum
 parseOnRampDatum utxoStr = coerce . inlineDatum <$> eitherDecode (BL8.pack utxoStr)
 
 
------ PARSE 'Value' -----
+----- :PARSE 'Value': -----
 
 toPlutusValue :: Api.Value -> V3.Value
 toPlutusValue val =
@@ -72,7 +72,7 @@ parseValue :: String -> Either String V3.Value
 parseValue utxoStr = coerce . value <$> eitherDecode (BL8.pack utxoStr)
 
 
------ PARSE 'Integer' -----
+----- :PARSE 'Integer': -----
 
 parseInteger :: String -> Either String Integer
 parseInteger = either (Left . show) Right . parse integerParser ""

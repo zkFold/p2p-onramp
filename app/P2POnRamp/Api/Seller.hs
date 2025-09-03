@@ -1,12 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TemplateHaskell   #-}
+
 
 module P2POnRamp.Api.Seller where
 
 import           Control.Exception             (throwIO)
--- import           Control.Monad.IO.Class        (liftIO)
-import           Control.Monad                 (when)
-import           Data.Aeson                    (FromJSON)
+import           Data.Aeson                    (FromJSON (..), ToJSON (..), object, withObject, (.=), (.:))
+import qualified Data.Aeson                    as Aeson
+import qualified Data.ByteArray                as BA
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Char8         as BSC
@@ -16,35 +18,31 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           GHC.Generics                  (Generic)
--- import           Network.Wai                   (Middleware)
--- import           Network.Wai.Handler.Warp      (defaultSettings, runSettings, setHost, setPort)
--- import           Network.Wai.Middleware.Cors   (cors, simpleCorsResourcePolicy, corsRequestHeaders, CorsResourcePolicy(..))
--- import           Network.HTTP.Types.Status     (unauthorized401)
+import           PlutusLedgerApi.V1.Value      (lovelaceValue)
+import           PlutusLedgerApi.V3            as V3
+import           PlutusTx                      (makeIsDataIndexed)
+import           Prelude
 import           Servant
--- import           Servant.API                   (PlainText)
--- import           System.IO                     (hFlush, stdout)
-
--- CBOR
-import           Codec.CBOR.Read               (deserialiseFromBytes)
-import           Codec.CBOR.Term               (Term(..), encodeTerm, decodeTerm)
-import           Codec.CBOR.Write              (toStrictByteString)
+import           System.FilePath               ((</>))
 
 -- Ed25519 (cryptonite)
 import           Crypto.Error                  (CryptoFailable(..))
 import qualified Crypto.PubKey.Ed25519         as Ed25519
-import           Prelude
 
-
-data SignRequest = SignRequest
-  { cose_sign1 :: Text   -- hex-encoded COSE_Sign1 (CBOR)
-  , signature  :: Text   -- hex-encoded 64-byte Ed25519 signature (R||S)
-  , pub_key    :: Text   -- hex-encoded 32-byte Ed25519 public key
-  } deriving (Show, Generic)
-
-instance FromJSON SignRequest
+import           P2POnRamp.Api.Context         (dbFile)
+import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder)
+import           ZkFold.Cardano.Crypto.Utils   (eitherHexToKey)
+import           ZkFold.Cardano.OffChain.Utils (dataToJSON)
+import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
 
 expectedMessage :: ByteString
 expectedMessage = "Hello messenger."
+
+newtype SPKB = SPKB BuiltinByteString
+
+sellerPKB :: BS.ByteString -> SPKB
+sellerPKB sellerPubKey = SPKB $ toBuiltin sellerPubKey
 
 --------------------------------------------------------------------------------
 -- Helpers
@@ -68,84 +66,101 @@ decodeHexSized n t what = do
     then Right bs
     else Left $ what <> " must be exactly " <> show n <> " bytes (got " <> show (BS.length bs) <> ")"
 
--- logLn :: String -> Handler ()
--- logLn s = liftIO $ putStrLn s >> hFlush stdout
-
-logLn :: String -> IO ()
-logLn = putStrLn
-
 hex :: ByteString -> Text
 hex = TE.decodeUtf8 . B16.encode
 
+
 --------------------------------------------------------------------------------
--- Handler
+-- Handlers: message & sign
 
-verifyH :: SignRequest -> IO Text
-verifyH req = do
-  logLn "--- Incoming verify request ---"
-  logLn $ "COSE_Sign1 (hex): " <> T.unpack (cose_sign1 req)
-  logLn $ "Signature (hex):  " <> T.unpack (signature  req)
-  logLn $ "Public key (hex): " <> T.unpack (pub_key    req)
+data VKey = VKey
+  { vkType :: Text
+  , description :: Text
+  , cborHex :: Text
+  } deriving Show
 
-  coseSign1Bytes <- either badRequest pure $
-    decodeHexStrict (cose_sign1 req)
+instance FromJSON VKey where
+  parseJSON = withObject "VKey" $ \o ->
+    VKey <$> o .: "type"
+         <*> o .: "description"
+         <*> o .: "cborHex"
 
-  let coseLazy = LBS.fromStrict coseSign1Bytes
+instance ToJSON VKey where
+  toJSON (VKey t d c) =
+    object [ "type"        .= t
+           , "description" .= d
+           , "cborHex"     .= c
+           ]
 
-  -- Decode COSE_Sign1 as a generic CBOR term: expected Array [protected_bstr, unprotected_map, payload_bstr, signature_bstr]
-  term <- case deserialiseFromBytes decodeTerm coseLazy of
-            Left _                 -> badRequest "Invalid COSE_Sign1 CBOR"
-            Right (_, t)           -> pure t
+data SellerOK = SellerOK
+  { message :: Text
+  , signatureHex :: Text
+  , vkeyJson :: VKey
+  , scheme :: Text
+  , note :: Text
+  } deriving (Show, Generic)
 
-  items <- case term of
-             TList xs | length xs == 4 -> pure xs
-             _                         -> badRequest "Expected COSE_Sign1 array of length 4"
+instance FromJSON SellerOK
+instance ToJSON SellerOK
 
-  protectedBytes <- case items !! 0 of
-                      TBytes b -> pure b
-                      _        -> badRequest "Invalid protected header type"
+handleMessage :: IO Text
+handleMessage = pure "hello"
 
-  payloadBytes <- case items !! 2 of
-                    TBytes b -> pure b
-                    _        -> badRequest "Invalid payload type"
+handleSigned :: SellerOK -> IO SellerOK
+handleSigned = pure
 
-  logLn $ "Protected (hex): " <> T.unpack (hex protectedBytes)
-  logLn $ "Payload   (hex): " <> T.unpack (hex payloadBytes)
-  logLn $ "Payload   (text): " <> T.unpack (TE.decodeUtf8With (\_ _ -> Just '�') payloadBytes)
 
-  when (payloadBytes /= expectedMessage) $
-    badRequest $ "Payload mismatch (expected " <> BSC.unpack expectedMessage <> ")"
+--------------------------------------------------------------------------------
+-- Handlers: seller data
 
-  -- Build Sig_structure = ["Signature1", protected, h'', payload]
-  let sigStructureTerm  = TList [ TString "Signature1"
-                                , TBytes protectedBytes
-                                , TBytes BS.empty      -- external_aad
-                                , TBytes payloadBytes
-                                ]
-      sigStructureBytes = toStrictByteString (encodeTerm sigStructureTerm)
+data SellerData = SellerData
+  { sdName          :: Text
+  , sdAccount       :: Text
+  , sdSellAda       :: Integer
+  , sdPrice         :: Integer
+  , sdSellerPKBytes :: Text
+  } deriving (Show, Generic)
 
-  logLn $ "Sig_structure (hex): " <> T.unpack (hex sigStructureBytes)
+instance FromJSON SellerData
+instance ToJSON SellerData
 
-  sigBytes <- either badRequest pure $
-    decodeHexSized 64 (signature req) "signature"
-  pkBytes  <- either badRequest pure $
-    decodeHexSized 32 (pub_key req)   "public key"
+data SellerInfoBBS = SellerInfoBBS
+  { sellerName'    :: BuiltinByteString
+  , sellerAccount' :: BuiltinByteString
+  } deriving Show
 
-  -- Parse public key & signature
-  pubKey <- case Ed25519.publicKey pkBytes of
-              CryptoPassed pk -> pure pk
-              CryptoFailed _  -> badRequest "Malformed public key"
+makeIsDataIndexed ''SellerInfoBBS [('SellerInfoBBS, 0)]
 
-  sig    <- case Ed25519.signature sigBytes of
-              CryptoPassed s  -> pure s
-              CryptoFailed _  -> badRequest "Malformed signature"
+fromSellerInfo :: SellerInfo -> SellerInfoBBS
+fromSellerInfo (SellerInfo nm acc) = SellerInfoBBS nm' acc'
+  where nm'  = toBuiltin $ TE.encodeUtf8 nm
+        acc' = toBuiltin $ TE.encodeUtf8 acc
 
-  -- Verify (Ed25519)
-  if Ed25519.verify pubKey sigStructureBytes sig
-     then do
-       logLn "✔ Verification OK"
-       pure "authorized"
-     else do
-       logLn "✖ Verification failed"
-       -- Match your Rust: 401 with body "not-authorized"
-       throwIO $ err401 { errBody = "not-authorized" }
+data NewOrder = NewOrder { newID :: Int, newDatum :: Aeson.Value }
+  deriving (Show, Generic)
+
+instance FromJSON NewOrder
+instance ToJSON NewOrder
+
+handleSellerData :: FilePath -> SellerData -> IO NewOrder
+handleSellerData path seller = do
+  let sellerInfo  = SellerInfo (sdName seller) (sdAccount seller)
+      sellerVKeyE = do
+        pkBytes <- eitherHexToKey . T.unpack $ sdSellerPKBytes seller
+        case Ed25519.publicKey pkBytes of
+          CryptoPassed vk -> Right vk
+          CryptoFailed _  -> Left "Malformed public key"
+
+  case sellerVKeyE of
+    Left err -> badRequest err
+    Right sellerVKey -> do
+      let paymentInfoHash   = dataToBlake $ fromSellerInfo sellerInfo
+          sellPriceUsd      = sdPrice seller
+          valueSold         = lovelaceValue . Lovelace $ sdSellAda seller
+          sellerPubKeyBytes = toBuiltin @BS.ByteString . BA.convert $ sellerVKey
+      
+      let sellerDatum = OnRampDatum paymentInfoHash sellPriceUsd valueSold sellerPubKeyBytes Nothing Nothing
+
+      newOrder <- createOrder (path </> dbFile) sellerInfo
+
+      return $ NewOrder (orderID newOrder) (dataToJSON sellerDatum)

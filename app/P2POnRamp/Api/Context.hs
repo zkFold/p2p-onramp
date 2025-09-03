@@ -4,22 +4,53 @@ module P2POnRamp.Api.Context where
 
 import           Data.Aeson
 import qualified Data.Text            as T
-import qualified Data.ByteString      as BS
+-- import qualified Data.ByteString      as BS
 import           GeniusYield.GYConfig (GYCoreConfig (..))
 import           GeniusYield.Types
 import           GHC.Generics
-import           PlutusLedgerApi.V3   (BuiltinByteString)
+import           PlutusLedgerApi.V3
+import           PlutusLedgerApi.V1.Value (lovelaceValue)
 import           Prelude
 
--- import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..))
+import           P2POnRamp.Utils               (hexToBuiltin)
+import           ZkFold.Cardano.OffChain.Utils (parseAddress)
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..), onRampCompiled)
+
+
+---------------------------- :Orders DB: ----------------------------
+
+dbFile :: FilePath
+dbFile = "orders.json"
+
+-------------------------- :OnRamp Params: --------------------------
+
+data OnRampParams' = OnRampParams'
+  { orpFeeAddress      :: String
+  , orpFeeValue        :: Integer
+  , orpFiatPubKeyBytes :: String
+  } deriving (Show, Generic)
+
+instance FromJSON OnRampParams'
+
+-- | Minting policy from OnRamp parameters decoded from JSON
+-- onRampPolicy :: OnRampParams' -> Either String (GYBuildScript PlutusV3)
+onRampPolicy :: OnRampParams' -> Either String (GYScript PlutusV3)
+onRampPolicy orParams' = do
+  feeAddr <- parseAddress $ orpFeeAddress orParams'
+  feePKBytes <- hexToBuiltin $ orpFiatPubKeyBytes orParams'
+  let feeVal = lovelaceValue . Lovelace $ orpFeeValue orParams'
+      orParams = OnRampParams feeAddr feeVal feePKBytes
+      mintScript = scriptFromPlutus @PlutusV3 $ onRampCompiled orParams
+  -- return $ GYMintScript @PlutusV3 mintScript
+  return mintScript
 
 ------------------------- :Context & Setup: -------------------------
 
 -- | Configuration context.
 data Ctx = Ctx
-  { ctxCoreCfg       :: !GYCoreConfig
-  , ctxProviders     :: !GYProviders
---  , ctxPartialParams :: !(BuiltinByteString -> OnRampParams)
+  { ctxCoreCfg      :: !GYCoreConfig
+  , ctxProviders    :: !GYProviders
+  , ctxOnRampParams :: !OnRampParams'
   }
 
 ------------------------- :Unsigned response: -------------------------

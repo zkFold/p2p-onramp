@@ -99,107 +99,107 @@ library
       zkfold-cardano
     hs-source-dirs: src
 
--- executable p2p-init-transaction
---   import:           options
---   default-language: Haskell2010
---   ghc-options:      -rtsopts
---   main-is:          Main.hs
---   hs-source-dirs:   backends/p2p-init-transaction
---   build-depends:
---     base              >= 4.9 && < 5,
---     bytestring                     ,
---     directory                      ,
---     filepath                       ,
---     p2p-onramp                     ,
---     plutus-ledger-api              ,
---     plutus-tx                      ,
---     plutus-tx-plugin               ,
---     zkfold-cardano
+executable p2p-init-transaction
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  hs-source-dirs:   backends/p2p-init-transaction
+  build-depends:
+    base              >= 4.9 && < 5,
+    bytestring                     ,
+    directory                      ,
+    filepath                       ,
+    p2p-onramp                     ,
+    plutus-ledger-api              ,
+    plutus-tx                      ,
+    plutus-tx-plugin               ,
+    zkfold-cardano
 
--- executable p2p-add-seller
---   import:           options
---   default-language: Haskell2010
---   ghc-options:      -rtsopts
---   main-is:          Main.hs
---   hs-source-dirs:   backends/p2p-add-seller
---   build-depends:
---     aeson                          ,
---     base              >= 4.9 && < 5,
---     bytestring                     ,
---     cryptonite                     ,
---     directory                      ,
---     filepath                       ,
---     p2p-onramp                     ,
---     plutus-ledger-api              ,
---     plutus-tx                      ,
---     zkfold-cardano
+executable p2p-add-seller
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  hs-source-dirs:   backends/p2p-add-seller
+  build-depends:
+    aeson                          ,
+    base              >= 4.9 && < 5,
+    bytestring                     ,
+    cryptonite                     ,
+    directory                      ,
+    filepath                       ,
+    p2p-onramp                     ,
+    plutus-ledger-api              ,
+    plutus-tx                      ,
+    zkfold-cardano
 
--- executable p2p-choose-offer
---   import:           options
---   default-language: Haskell2010
---   ghc-options:      -rtsopts
---   main-is:          Main.hs
---   hs-source-dirs:   backends/p2p-choose-offer
---   build-depends:
---     aeson                          ,
---     base              >= 4.9 && < 5,
---     bytestring                     ,
---     directory                      ,
---     filepath                       ,
---     p2p-onramp                     ,
---     plutus-ledger-api              ,
+executable p2p-choose-offer
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  hs-source-dirs:   backends/p2p-choose-offer
+  build-depends:
+    aeson                          ,
+    base              >= 4.9 && < 5,
+    bytestring                     ,
+    directory                      ,
+    filepath                       ,
+    p2p-onramp                     ,
+    plutus-ledger-api              ,
 
--- executable p2p-buy-order
---   import:           options
---   default-language: Haskell2010
---   ghc-options:      -rtsopts
---   main-is:          Main.hs
---   hs-source-dirs:   backends/p2p-buy-order
---   build-depends:
---     aeson                          ,
---     base              >= 4.9 && < 5,
---     base16-bytestring              ,
---     bytestring                     ,
---     cryptonite                     ,
---     directory                      ,
---     filepath                       ,
---     memory                         ,
---     p2p-onramp                     ,
---     plutus-ledger-api              ,
---     plutus-tx                      ,
---     zkfold-cardano
+executable p2p-buy-order
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  hs-source-dirs:   backends/p2p-buy-order
+  build-depends:
+    aeson                          ,
+    base              >= 4.9 && < 5,
+    base16-bytestring              ,
+    bytestring                     ,
+    cryptonite                     ,
+    directory                      ,
+    filepath                       ,
+    memory                         ,
+    p2p-onramp                     ,
+    plutus-ledger-api              ,
+    plutus-tx                      ,
+    zkfold-cardano
 
--- executable p2p-claim-transaction
---   import:           options
---   default-language: Haskell2010
---   ghc-options:      -rtsopts
---   main-is:          Main.hs
---   hs-source-dirs:   backends/p2p-claim-transaction
---   build-depends:
---     base              >= 4.9 && < 5,
---     base16-bytestring              ,
---     bytestring                     ,
---     cryptonite                     ,
---     directory                      ,
---     filepath                       ,
---     memory                         ,
---     p2p-onramp                     ,
---     plutus-tx                      ,
---     zkfold-cardano
+executable p2p-claim-transaction
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  hs-source-dirs:   backends/p2p-claim-transaction
+  build-depends:
+    base              >= 4.9 && < 5,
+    base16-bytestring              ,
+    bytestring                     ,
+    cryptonite                     ,
+    directory                      ,
+    filepath                       ,
+    memory                         ,
+    p2p-onramp                     ,
+    plutus-tx                      ,
+    zkfold-cardano
 
--- test-suite p2p-onramp-test
---     import: options
---     type: exitcode-stdio-1.0
---     ghc-options: -rtsopts
---     main-is: Main.hs
---     other-modules:
---     build-depends:
---       base                          >= 4.9 && < 5,
---       hspec                                < 2.12,
---       QuickCheck                                 ,
---       p2p-onramp                                 ,
---       symbolic-base                              ,
---     hs-source-dirs: tests
+test-suite p2p-onramp-test
+    import: options
+    type: exitcode-stdio-1.0
+    ghc-options: -rtsopts
+    main-is: Main.hs
+    other-modules:
+    build-depends:
+      base                          >= 4.9 && < 5,
+      hspec                                < 2.12,
+      QuickCheck                                 ,
+      p2p-onramp                                 ,
+      symbolic-base                              ,
+    hs-source-dirs: tests
 
 executable p2p-server
     import:           options
@@ -209,8 +209,11 @@ executable p2p-server
     hs-source-dirs:   app
     other-modules:
       P2POnRamp.Api
+      P2POnRamp.Api.Addr
       P2POnRamp.Api.Context
       P2POnRamp.Api.Seller
+      P2POnRamp.OrdersDB
+      P2POnRamp.Utils
     build-depends:
       aeson                          ,
       atlas-cardano                  ,
@@ -223,34 +226,32 @@ executable p2p-server
       directory                      ,
       filepath                       ,
       http-types                     ,
+      memory                         ,
       p2p-onramp                     ,
       plutus-ledger-api              ,
       plutus-tx                      ,
       plutus-tx-plugin               ,
       servant                        ,
       servant-server                 ,
+      text                           ,
       transformers                   ,
+      unix                           ,
       wai                            ,
       wai-cors                       ,
       warp                           ,
-      text                           ,
       zkfold-cardano
 
--- executable setup
---   import:           options
---   default-language: Haskell2010
---   ghc-options:      -rtsopts
---   main-is:          Main.hs
---   hs-source-dirs:   app/P2POnRamp/Api
---   build-depends:
---     aeson                          ,
---     atlas-cardano                  ,
---     base              >= 4.9 && < 5,
---     bytestring                     ,
---     directory                      ,
---     filepath                       ,
---     p2p-onramp                     ,
---     plutus-ledger-api              ,
---     plutus-tx                      ,
---     plutus-tx-plugin               ,
---     zkfold-cardano
+executable check
+  import:           options
+  default-language: Haskell2010
+  ghc-options:      -rtsopts
+  main-is:          Main.hs
+  hs-source-dirs:   app/check
+  build-depends:
+    atlas-cardano                  ,
+    base              >= 4.9 && < 5,
+    directory                      ,
+    filepath                       ,
+    p2p-onramp                     ,
+    plutus-ledger-api
+
