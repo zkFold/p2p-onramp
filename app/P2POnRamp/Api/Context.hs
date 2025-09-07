@@ -2,16 +2,22 @@
 
 module P2POnRamp.Api.Context where
 
+import           Control.Exception             (throwIO)
 import           Data.Aeson
 import qualified Data.Text            as T
 -- import qualified Data.ByteString      as BS
+import qualified Data.ByteString.Lazy      as BL
+import qualified Data.ByteString.Char8         as BSC
+import qualified Data.ByteString.Lazy          as LBS
 import           GeniusYield.GYConfig (GYCoreConfig (..))
 import           GeniusYield.Types
 import           GHC.Generics
 import           PlutusLedgerApi.V3
 import           PlutusLedgerApi.V1.Value (lovelaceValue)
 import           Prelude
+import           Servant
 
+import           P2POnRamp.OrdersDB            (DB)
 import           P2POnRamp.Utils               (hexToBuiltin)
 import           ZkFold.Cardano.OffChain.Utils (parseAddress)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..), onRampCompiled)
@@ -21,6 +27,11 @@ import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..), onRampCompile
 
 dbFile :: FilePath
 dbFile = "orders.json"
+
+readDB :: FilePath -> IO (Either String DB)
+readDB path = do
+  bytes <- BL.readFile path
+  pure (eitherDecode bytes)
 
 -------------------------- :OnRamp Params: --------------------------
 
@@ -53,21 +64,6 @@ data Ctx = Ctx
   , ctxOnRampParams :: !OnRampParams'
   }
 
-------------------------- :Unsigned response: -------------------------
-
-data UnsignedTxResponse = UnsignedTxResponse
-  { urspTxBodyHex :: !T.Text           -- ^ Unsigned transaction cbor.
-  , urspTxFee     :: !(Maybe Integer)  -- ^ Tx fees.
-  } deriving stock (Show, Generic)
-    deriving anyclass ToJSON
-
--- | Construct `UnsignedTxResponse` return type for our endpoint given the transaction body.
-unSignedTxWithFee :: GYTxBody -> UnsignedTxResponse
-unSignedTxWithFee txBody = UnsignedTxResponse
-  { urspTxBodyHex  = T.pack . txToHex $ unsignedTx txBody
-  , urspTxFee      = Just $ txBodyFee txBody
-  }
-
 ------------------------- :own address: -------------------------
 
 -- | Own addresses input.
@@ -83,3 +79,14 @@ data OwnPubKeyBytes = OwnPubKeyBytes { oaPubKeyBytes :: !T.Text }
 -- | Handle to get own address.
 handleOwnAddr :: OwnAddresses -> IO OwnPubKeyBytes
 handleOwnAddr OwnAddresses{..} = pure . OwnPubKeyBytes . addressToText $ head oaUsedAddrs
+
+------------------------- :http helpers: -------------------------
+
+badRequest :: String -> IO a
+badRequest msg = throwIO $ err400 { errBody = LBS.fromStrict (BSC.pack msg) }
+
+notFoundErr :: String -> IO a
+notFoundErr msg = throwIO $ err404 { errBody = LBS.fromStrict (BSC.pack msg) }
+
+internalErr :: String -> IO a
+internalErr msg = throwIO $ err500 { errBody = LBS.fromStrict (BSC.pack msg) }

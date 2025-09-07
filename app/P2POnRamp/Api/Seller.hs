@@ -10,13 +10,18 @@ import           Data.Aeson                    (FromJSON (..), ToJSON (..), obje
 import qualified Data.Aeson                    as Aeson
 import qualified Data.ByteArray                as BA
 import           Data.ByteString               (ByteString)
+-- import qualified Data.ByteString.Lazy          as BL
 import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Char8         as BSC
 import qualified Data.ByteString.Base16        as B16
 import qualified Data.ByteString.Lazy          as LBS
+import           Data.String                   (fromString)
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
+import           GeniusYield.GYConfig          (GYCoreConfig (..))
+import           GeniusYield.Types
+import           GeniusYield.TxBuilder
 import           GHC.Generics                  (Generic)
 import           PlutusLedgerApi.V1.Value      (lovelaceValue)
 import           PlutusLedgerApi.V3            as V3
@@ -29,8 +34,8 @@ import           System.FilePath               ((</>))
 import           Crypto.Error                  (CryptoFailable(..))
 import qualified Crypto.PubKey.Ed25519         as Ed25519
 
-import           P2POnRamp.Api.Context         (dbFile)
-import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder)
+import           P2POnRamp.Api.Context         (Ctx (..), dbFile, readDB)
+import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder, setSellPostTxIfNull, DB (..))
 import           ZkFold.Cardano.Crypto.Utils   (eitherHexToKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToJSON)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
@@ -49,6 +54,9 @@ sellerPKB sellerPubKey = SPKB $ toBuiltin sellerPubKey
 
 badRequest :: String -> IO a
 badRequest msg = throwIO $ err400 { errBody = LBS.fromStrict (BSC.pack msg) }
+
+notFoundErr :: String -> IO a
+notFoundErr msg = throwIO $ err404 { errBody = LBS.fromStrict (BSC.pack msg) }
 
 internalErr :: String -> IO a
 internalErr msg = throwIO $ err500 { errBody = LBS.fromStrict (BSC.pack msg) }
@@ -164,3 +172,86 @@ handleSellerData path seller = do
       newOrder <- createOrder (path </> dbFile) sellerInfo
 
       return $ NewOrder (orderID newOrder) (dataToJSON sellerDatum)
+
+
+--------------------------------------------------------------------------------
+-- Handlers: put seller's Tx
+
+data SellerTx = SellerTx { stID :: Int, stTx :: Text }
+  deriving (Show, Generic)
+
+instance FromJSON SellerTx
+instance ToJSON SellerTx
+
+handleSellerTx :: FilePath -> SellerTx -> IO Bool
+handleSellerTx path SellerTx{..} = setSellPostTxIfNull (path </> dbFile) stID stTx
+
+
+--------------------------------------------------------------------------------
+-- Handlers: get orders DB (ToDo: move somewhere else)
+
+data OrderPair = OrderPair
+  { opLovelace :: Integer
+  , opPriceUsd :: Integer
+  } deriving (Show, Eq, Generic)
+
+instance FromJSON OrderPair
+instance ToJSON OrderPair
+
+data SellOrder = SellOrder
+  { soOrderID :: Int
+  , soInfo    :: SellerInfo
+  , soPair    :: Maybe OrderPair
+  } deriving (Show, Eq, Generic)
+
+instance FromJSON SellOrder
+instance ToJSON SellOrder
+
+-- readDB :: FilePath -> IO (Either String DB)
+-- readDB path = do
+--   bytes <- BL.readFile path
+--   pure (eitherDecode bytes)
+
+filterOrdersBySell :: [Order] -> [(GYTxOutRef, SellOrder)]
+filterOrdersBySell os =
+  [ (fromString $ T.unpack txid ++ "#0", SellOrder orderID sellerInfo Nothing)
+  | Order{ orderID
+         , sellerInfo
+         , sellPostTx    = Just txid
+         , buyPostTx     = Nothing
+         , completedData = Nothing
+         } <- os
+  ]
+
+sellOrders :: Ctx -> (GYTxOutRef, SellOrder) -> IO SellOrder
+sellOrders Ctx{..} (oref, so) = do
+  let nid       = cfgNetworkId ctxCoreCfg
+      providers = ctxProviders
+
+  mutxo <- runGYTxQueryMonadIO nid
+                               providers $
+                               utxoAtTxOutRef oref
+
+  let mop = do
+        utxo <- mutxo
+        let dat = outDatumToPlutus $ utxoOutDatum utxo
+
+        orDat' <- case dat of
+          OutputDatum d -> Just $ getDatum d
+          _             -> Nothing
+        orDat  <- fromBuiltinData @OnRampDatum orDat'
+
+        let sellLovelace = valueAssetClass (utxoValue utxo) GYLovelace
+            priceUsd     = sellPriceUsd orDat
+
+        pure $ OrderPair sellLovelace priceUsd
+
+  return $ so { soPair = mop }
+
+handleSellOrders :: Ctx -> FilePath -> IO [SellOrder]
+handleSellOrders ctx path = do
+  dbE <- readDB (path </> dbFile)
+  case dbE of
+    Left err -> badRequest err
+    Right db -> mapM (sellOrders ctx) (filterOrdersBySell $ orders db)
+      
