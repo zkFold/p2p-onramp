@@ -169,26 +169,6 @@ handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
 
       onRampDatumUpdated <- updateDatum selectedUtxo buyerPKH timeInc
 
-      -- let buyerPKH' = pubKeyHashToPlutus buyerPKH
-      -- let morDat = do
-      --       let dat = outDatumToPlutus $ utxoOutDatum selectedUtxo
-      --       orDat' <- case dat of
-      --         OutputDatum d -> Just $ getDatum d
-      --         _             -> Nothing
-      --       orDat  <- fromBuiltinData @OnRampDatum orDat'
-      --       pure orDat
-
-      -- newDat <- case morDat of
-      --   Nothing -> badRequest "Unexpected: datum missing"
-      --   Just d  -> do
-      --     t0 <- getCurrentGYTime
-      --     let t1  = addSeconds t0 $ fromInteger 600
-      --         t1' = timeToPlutus t1
-      --         d'  = d { buyerPubKeyHash = Just buyerPKH'
-      --                 , timelock = Just t1'
-      --                 }
-      --     return d'
-
       let orDatUpdatedHash = fromBuiltin $ dataToBlake onRampDatumUpdated  -- DEBUG: testing
       BS.writeFile (path </> "buyerCommit.bin") orDatUpdatedHash           -- DEBUG: testing
 

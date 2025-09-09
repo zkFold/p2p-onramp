@@ -35,7 +35,9 @@ import           Crypto.Error                  (CryptoFailable(..))
 import qualified Crypto.PubKey.Ed25519         as Ed25519
 
 import           P2POnRamp.Api.Context         (Ctx (..), dbFile, readDB)
+import           P2POnRamp.Api.Tx              (UnsignedTxResponse (..))
 import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder, setSellPostTxIfNull, DB (..))
+-- import           P2POnRamp.Utils               (hexToBuiltin')
 import           ZkFold.Cardano.Crypto.Utils   (eitherHexToKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToJSON)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
@@ -169,9 +171,9 @@ handleSellerData path seller = do
       
       let sellerDatum = OnRampDatum paymentInfoHash sellPriceUsd valueSold sellerPubKeyBytes Nothing Nothing
 
-      newOrder <- createOrder (path </> dbFile) sellerInfo
+      newOrderID <- createOrder (path </> dbFile) sellerInfo
 
-      return $ NewOrder (orderID newOrder) (dataToJSON sellerDatum)
+      return $ NewOrder (orderID newOrderID) (dataToJSON sellerDatum)
 
 
 --------------------------------------------------------------------------------
