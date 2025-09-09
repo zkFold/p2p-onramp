@@ -1,14 +1,10 @@
 module P2POnRamp.Api.Tx where
 
--- import           Control.Monad      (void)
 import           Data.Aeson
 import qualified Data.Text            as T
 import           GeniusYield.Types
 import           GHC.Generics
 import           Prelude
-
--- import           P2POnRamp.Api.Context
-
 
 ------------------------- :Unsigned response: -------------------------
 
@@ -26,15 +22,6 @@ unSignedTxWithFee txBody = UnsignedTxResponse
   , urspTxFee      = Just $ txBodyFee txBody
   }
 
--- -- | Submit parameters to add for witness.
--- data AddWitAndSubmitParams = AddWitAndSubmitParams
---   { awasTxUnsigned :: !GYTx
---   , awasTxWit      :: !GYTxWitness
---   } deriving Generic
-
--- instance FromJSON AddWitAndSubmitParams
-
-
 ---------------------------- :Submit Tx: ----------------------------
 
 -- | Return type of API when submitting a transaction.
@@ -51,10 +38,3 @@ txBodySubmitTxResult txBody = SubmitTxResult
   { submitTxFee = txBodyFee txBody
   , submitTxId  = txBodyTxId txBody
   }
-
--- -- | Handle for adding key witness to the unsigned transaction & then submit it.
--- handleAddWitAndSubmitTx :: Ctx -> AddWitAndSubmitParams -> IO SubmitTxResult
--- handleAddWitAndSubmitTx Ctx{..} AddWitAndSubmitParams{..} = do
---   let txBody = getTxBody awasTxUnsigned
---   void . gySubmitTx ctxProviders $ makeSignedTransaction awasTxWit txBody
---   return $ txBodySubmitTxResult txBody

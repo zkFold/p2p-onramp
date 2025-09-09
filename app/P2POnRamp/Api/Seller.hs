@@ -10,7 +10,6 @@ import           Data.Aeson                    (FromJSON (..), ToJSON (..), obje
 import qualified Data.Aeson                    as Aeson
 import qualified Data.ByteArray                as BA
 import           Data.ByteString               (ByteString)
--- import qualified Data.ByteString.Lazy          as BL
 import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Char8         as BSC
 import qualified Data.ByteString.Base16        as B16
@@ -29,15 +28,12 @@ import           PlutusTx                      (makeIsDataIndexed)
 import           Prelude
 import           Servant
 import           System.FilePath               ((</>))
-
--- Ed25519 (cryptonite)
 import           Crypto.Error                  (CryptoFailable(..))
 import qualified Crypto.PubKey.Ed25519         as Ed25519
 
 import           P2POnRamp.Api.Context         (Ctx (..), dbFile, readDB)
 import           P2POnRamp.Api.Tx              (UnsignedTxResponse (..))
 import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder, setSellPostTxIfNull, DB (..))
--- import           P2POnRamp.Utils               (hexToBuiltin')
 import           ZkFold.Cardano.Crypto.Utils   (eitherHexToKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToJSON)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
@@ -208,11 +204,6 @@ data SellOrder = SellOrder
 
 instance FromJSON SellOrder
 instance ToJSON SellOrder
-
--- readDB :: FilePath -> IO (Either String DB)
--- readDB path = do
---   bytes <- BL.readFile path
---   pure (eitherDecode bytes)
 
 filterOrdersBySell :: [Order] -> [(GYTxOutRef, SellOrder)]
 filterOrdersBySell os =

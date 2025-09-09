@@ -4,20 +4,12 @@
 
 module P2POnRamp.Api.Buyer where
 
--- import           Cardano.Api                            (AssetName (..),
---                                                          parseAddressAny)
--- import           Control.Exception                      (throwIO)
 import           Control.Monad                 (void)
 import           Data.Aeson
 import qualified Data.ByteString               as BS
--- import qualified Data.ByteString.Char8                  as BS8
--- import qualified Data.ByteString.Lazy                   as BL
--- import           Data.Coerce                            (coerce)
--- import qualified Data.Map.Strict                        as Map
 import           Data.Default
 import           Data.Maybe                    (fromJust)
 import           Data.List                     (find)
--- import           Data.Maybe                             (fromJust)
 import           Data.String                            (fromString)
 import qualified Data.ByteString.Base16        as B16
 import qualified Data.Text                     as T
@@ -28,20 +20,14 @@ import           GeniusYield.Types
 import           GHC.Generics
 import           PlutusLedgerApi.V3            as V3
 import           Prelude
-import           System.FilePath                        ((</>))
--- import           Test.QuickCheck.Arbitrary              (Arbitrary (..))
--- import           Test.QuickCheck.Gen                    (generate)
--- import           Text.Parsec                            (parse)
+import           System.FilePath               ((</>))
 
-import           P2POnRamp.Api.Context                  (Ctx (..), badRequest, dbFile, notFoundErr, onRampPolicy, readDB)
+import           P2POnRamp.Api.Context         (Ctx (..), badRequest, dbFile, notFoundErr, onRampPolicy, readDB)
 import           P2POnRamp.Api.Tx              (SubmitTxResult (..), UnsignedTxResponse, txBodySubmitTxResult, unSignedTxWithFee)
 import           P2POnRamp.OrdersDB            (DB (..), Order (..), setBuyPostTxIfNull)
 import           P2POnRamp.Utils               (hexToBuiltin)
+import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..), OnRampRedeemer (..))
-
--- import           ZkFold.Cardano.OffChain.Utils          (byteStringAsHex)
--- import qualified ZkFold.Cardano.OnChain.BLS12_381.F     as F
-import           ZkFold.Cardano.OnChain.Utils           (dataToBlake)
 
 
 -- | Buyer's public key and selected sell-order.
@@ -57,8 +43,6 @@ instance ToJSON BuyCommit
 -- | ToDo: decide on a mechanism to set time increment.
 timeInc :: Integer
 timeInc = 600  -- 10 minutes
-
--- ToDo: implement seller signing
 
 testSig :: BuiltinByteString  -- DEBUG
 testSig = case hexToBuiltin "71530aa2cdd8ae2df23cc586301e9c57e7107025b1f85d6a8bc75d127f0c584eb15f17a6b1c4a729d92abe82e3ef19c1ea21f965557557db59d9add6b443c301" of
