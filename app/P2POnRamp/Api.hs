@@ -8,45 +8,51 @@ import qualified Network.HTTP.Types          as HttpTypes
 import           Network.Wai.Middleware.Cors
 import           Prelude
 import           Servant
-import           Data.Text                    (Text)
 
-import           P2POnRamp.Api.Context        (Ctx (..), OwnPubKeyBytes,
-                                               OwnAddresses, handleOwnAddr)
-import           P2POnRamp.Api.Addr           (handleGetOnRampAddr)
-import           P2POnRamp.Api.Buyer          (AddBuySubmitParams (..), BuyCommit, BuyCommitHash, handleBuyCommitHash, handleBuildBuyTx, handleSubmitBuyTx)
-import           P2POnRamp.Api.Seller         (SellerOK, handleMessage, handleSigned, SellerData, handleSellerData, NewOrder, SellerTx, handleSellerTx, SellOrder (..), handleSellOrders)
-import           P2POnRamp.Api.Tx             (SubmitTxResult, UnsignedTxResponse)
+import           P2POnRamp.Api.Context        (Ctx (..))
+import           P2POnRamp.Api.BuyerCommit    (BuyCommit, handleBuildBuyTx, handleSubmitBuyTx)
+import           P2POnRamp.Api.BuyerClaim     (FiatVerify, FiatVerified, handleFiatSign, ClaimCrypto, handleBuildClaimTx, handleSubmitClaimTx)
+import           P2POnRamp.Api.Seller         (CancelOrder, NewOrder, SellerData, SellOrder, SellerTx,
+                                               handleBuildCancelTx, handleBuildSellTx, handleSellerData, handleSellOrders, handleSubmitCancelTx, handleSubmitSellTx)
+import           P2POnRamp.Api.Tx             (AddSubmitParams, SubmitTxResult, UnsignedTxResponse)
 
 
 -- | Type for our Servant API.
-type API = "message" :> Get '[PlainText] Text
-      :<|> "signed" :> ReqBody '[JSON] SellerOK
-                    :> Post '[JSON] SellerOK
-      :<|> "seller-data" :> ReqBody '[JSON] SellerData
+type API = "seller-data" :> ReqBody '[JSON] SellerData
                          :> Post '[JSON] NewOrder
-      :<|> "onramp-addr" :> Get '[PlainText] Text
-      :<|> "post-seller-txid" :> ReqBody '[JSON] SellerTx
-                              :> Post '[JSON] Bool
+      :<|> "sell-build" :> ReqBody '[JSON] SellerTx
+                        :> Post '[JSON] UnsignedTxResponse
+      :<|> "sell-submit" :> ReqBody '[JSON] AddSubmitParams
+                         :> Post '[JSON] SubmitTxResult
+      :<|> "cancel-build" :> ReqBody '[JSON] CancelOrder
+                          :> Post '[JSON] UnsignedTxResponse
+      :<|> "cancel-submit" :> ReqBody '[JSON] AddSubmitParams
+                           :> Post '[JSON] SubmitTxResult
       :<|> "sell-orders" :> Get '[JSON] [SellOrder]
-      :<|> "buy-commit" :> Get '[JSON] BuyCommitHash
       :<|> "buy-build" :> ReqBody '[JSON] BuyCommit
                        :> Post '[JSON] UnsignedTxResponse
-      :<|> "buy-submit" :> ReqBody '[JSON] AddBuySubmitParams
+      :<|> "buy-submit" :> ReqBody '[JSON] AddSubmitParams
                         :> Post '[JSON] SubmitTxResult
-      :<|> "own-addr" :> ReqBody '[JSON] OwnAddresses
-                      :> Post    '[JSON] OwnPubKeyBytes
+      :<|> "fiat-verify" :> ReqBody '[JSON] FiatVerify
+                         :> Post '[JSON] FiatVerified
+      :<|> "claim-build" :> ReqBody '[JSON] ClaimCrypto
+                         :> Post '[JSON] UnsignedTxResponse
+      :<|> "claim-submit" :> ReqBody '[JSON] AddSubmitParams
+                          :> Post '[JSON] SubmitTxResult
 
 -- | Server Handler
 server :: Ctx -> FilePath -> ServerT API IO
-server ctx path = handleMessage :<|> handleSigned
-        :<|> handleSellerData path
-        :<|> handleGetOnRampAddr ctx
-        :<|> handleSellerTx path
-        :<|> handleSellOrders ctx path
-        :<|> handleBuyCommitHash path
-        :<|> handleBuildBuyTx ctx path
-        :<|> handleSubmitBuyTx ctx path
-        :<|> handleOwnAddr
+server ctx path = handleSellerData path
+             :<|> handleBuildSellTx ctx path
+             :<|> handleSubmitSellTx ctx path
+             :<|> handleBuildCancelTx ctx path
+             :<|> handleSubmitCancelTx ctx path
+             :<|> handleSellOrders ctx path
+             :<|> handleBuildBuyTx ctx path
+             :<|> handleSubmitBuyTx ctx path
+             :<|> handleFiatSign path
+             :<|> handleBuildClaimTx ctx path
+             :<|> handleSubmitClaimTx ctx path
 
 appApi :: Proxy API
 appApi = Proxy

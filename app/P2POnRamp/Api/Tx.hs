@@ -24,6 +24,16 @@ unSignedTxWithFee txBody = UnsignedTxResponse
 
 ---------------------------- :Submit Tx: ----------------------------
 
+-- | Submit parameters to add for witness and order Id for seller Tx.
+-- Assumption: frontend honestly sends the correct order ID.
+data AddSubmitParams = AddSubmitParams
+  { aspTxUnsigned :: !GYTx
+  , aspTxWit      :: !GYTxWitness
+  , aspOrderID    :: !Int
+  } deriving Generic
+
+instance FromJSON AddSubmitParams
+
 -- | Return type of API when submitting a transaction.
 data SubmitTxResult = SubmitTxResult
   { submitTxFee :: !Integer

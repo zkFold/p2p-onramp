@@ -1,19 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE TemplateHaskell   #-}
+-- {-# LANGUAGE TemplateHaskell   #-}
 
-module P2POnRamp.Api.Buyer where
+module P2POnRamp.Api.BuyerCommit where
 
 import           Control.Monad                 (void)
+-- import           Crypto.PubKey.Ed25519
 import           Data.Aeson
+-- import qualified Data.ByteArray                as BA
 import qualified Data.ByteString               as BS
 import           Data.Default
 import           Data.Maybe                    (fromJust)
 import           Data.List                     (find)
 import           Data.String                            (fromString)
-import qualified Data.ByteString.Base16        as B16
+-- import qualified Data.ByteString.Base16        as B16
 import qualified Data.Text                     as T
-import qualified Data.Text.Encoding            as TE
+-- import qualified Data.Text.Encoding            as TE
 import           GeniusYield.GYConfig                   (GYCoreConfig (..))
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
@@ -22,10 +24,11 @@ import           PlutusLedgerApi.V3            as V3
 import           Prelude
 import           System.FilePath               ((</>))
 
-import           P2POnRamp.Api.Context         (Ctx (..), badRequest, dbFile, notFoundErr, onRampPolicy, readDB)
-import           P2POnRamp.Api.Tx              (SubmitTxResult (..), UnsignedTxResponse, txBodySubmitTxResult, unSignedTxWithFee)
+import           P2POnRamp.Api.Context         (Ctx (..), badRequest, dbFile, internalErr, notFoundErr, onRampPolicy, readDB)
+import           P2POnRamp.Api.Tx              (AddSubmitParams (..), SubmitTxResult (..), UnsignedTxResponse, txBodySubmitTxResult, unSignedTxWithFee)
 import           P2POnRamp.OrdersDB            (DB (..), Order (..), setBuyPostTxIfNull)
 import           P2POnRamp.Utils               (hexToBuiltin)
+-- import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..), OnRampRedeemer (..))
 
@@ -44,7 +47,7 @@ instance ToJSON BuyCommit
 timeInc :: Integer
 timeInc = 600  -- 10 minutes
 
-testSig :: BuiltinByteString  -- DEBUG
+testSig :: BuiltinByteString
 testSig = case hexToBuiltin "71530aa2cdd8ae2df23cc586301e9c57e7107025b1f85d6a8bc75d127f0c584eb15f17a6b1c4a729d92abe82e3ef19c1ea21f965557557db59d9add6b443c301" of
   Left _  -> error $ "Unexpected: not an ex string"
   Right b -> b
@@ -107,21 +110,21 @@ handleBuyerCommit Ctx{..} path bc@BuyCommit{..} = do
 
       return bc
 
-data BuyCommitHash = BuyCommitHash { hex :: T.Text }
-  deriving (Show, Generic)
+-- data BuyCommitHash = BuyCommitHash { hex :: T.Text }
+--   deriving (Show, Generic)
 
-instance ToJSON BuyCommitHash
+-- instance ToJSON BuyCommitHash
 
-handleBuyCommitHash :: FilePath -> IO BuyCommitHash
-handleBuyCommitHash path = do
-  bs <- BS.readFile (path </> "buyerCommit.bin")
-  return . BuyCommitHash . TE.decodeUtf8 $ B16.encode bs
+-- handleBuyCommitHash :: FilePath -> IO BuyCommitHash
+-- handleBuyCommitHash path = do
+--   bs <- BS.readFile (path </> "buyerCommit.bin")
+--   return . BuyCommitHash . TE.decodeUtf8 $ B16.encode bs
 
 handleBuildBuyTx :: Ctx -> FilePath -> BuyCommit -> IO UnsignedTxResponse
 handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
   dbE <- readDB (path </> dbFile)
   case dbE of
-    Left err -> badRequest err
+    Left err -> internalErr err
     Right db -> do
       let nid           = cfgNetworkId ctxCoreCfg
           providers     = ctxProviders
@@ -129,7 +132,7 @@ handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
           onRampScriptE = onRampPolicy ctxOnRampParams
 
       onRampScript <- case onRampScriptE of
-        Left err     -> badRequest err  -- ToDo: change to 'internal error'
+        Left err     -> internalErr err
         Right script -> pure script
 
       let onRampAddr = addressFromValidator nid onRampScript
@@ -153,15 +156,14 @@ handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
 
       onRampDatumUpdated <- updateDatum selectedUtxo buyerPKH timeInc
 
-      let orDatUpdatedHash = fromBuiltin $ dataToBlake onRampDatumUpdated  -- DEBUG: testing
-      BS.writeFile (path </> "buyerCommit.bin") orDatUpdatedHash           -- DEBUG: testing
+      -- let orDatUpdatedHash = fromBuiltin $ dataToBlake onRampDatumUpdated  -- DEBUG: testing
+      -- BS.writeFile (path </> "buyerCommit.bin") orDatUpdatedHash           -- DEBUG: testing
 
       let inlineDatumNew = Just ( datumFromPlutusData $ toBuiltinData onRampDatumUpdated
                                 , GYTxOutUseInlineDatum @PlutusV3
                                 )
 
-      let redeemer = redeemerFromPlutusData . toBuiltinData $ Update testSig  -- DEBUG
-      -- let redeemer = redeemerFromPlutusData . toBuiltinData $ Test  -- DEBUG
+      let redeemer = redeemerFromPlutusData . toBuiltinData $ Update testSig
 
       let onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
           onRampWit = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
@@ -175,7 +177,7 @@ handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
                                       bcBuyerAddrs
                                       bcChangeAddr
                                       Nothing $ do
-        cslot     <- slotOfCurrentBlock
+        cslot <- slotOfCurrentBlock
 
         let upperSlot = fromJust $ advanceSlot cslot 300  -- allow five minutes to complete Tx submission
             skeleton  = skeleton' <> isInvalidAfter upperSlot
@@ -184,24 +186,22 @@ handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
 
       return $ unSignedTxWithFee txBody
 
--- | Submit parameters to add for witness and order Id.  Assumption: frontend
--- honestly sends the correct order ID.
-data AddBuySubmitParams = AddBuySubmitParams
-  { abspTxUnsigned :: !GYTx
-  , abspTxWit      :: !GYTxWitness
-  , abspOrderID    :: !Int
-  } deriving Generic
+-- -- | Submit parameters to add for witness and order Id.  Assumption: frontend
+-- -- honestly sends the correct order ID.
+-- data AddBuySubmitParams = AddBuySubmitParams
+--   { abspTxUnsigned :: !GYTx
+--   , abspTxWit      :: !GYTxWitness
+--   , abspOrderID    :: !Int
+--   } deriving Generic
 
-instance FromJSON AddBuySubmitParams
+-- instance FromJSON AddBuySubmitParams
 
 -- | Add key witness to the unsigned tx, submit tx and store txid.
-handleSubmitBuyTx :: Ctx -> FilePath -> AddBuySubmitParams -> IO SubmitTxResult
-handleSubmitBuyTx Ctx{..} path AddBuySubmitParams{..} = do
-  let txBody = getTxBody abspTxUnsigned
-  txid <- gySubmitTx ctxProviders $ makeSignedTransaction abspTxWit txBody
+handleSubmitBuyTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult
+handleSubmitBuyTx Ctx{..} path AddSubmitParams{..} = do
+  let txBody = getTxBody aspTxUnsigned
+  txid <- gySubmitTx ctxProviders $ makeSignedTransaction aspTxWit txBody
   void $ gyAwaitTxConfirmed ctxProviders def txid
   let submitResult = txBodySubmitTxResult txBody
-  void . setBuyPostTxIfNull (path </> dbFile) abspOrderID . T.pack . show $ submitTxId submitResult
+  void . setBuyPostTxIfNull (path </> dbFile) aspOrderID . T.pack $ show txid
   return submitResult
-
---  return $ SubmitTxResult 123456 (fromString "deadbeef461a637bbdfc69d85d8ca22ff6fbfa27afafd5a2b151fb6853ceb5cf")  --DEBUG

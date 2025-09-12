@@ -9,7 +9,7 @@ module ZkFold.Cardano.UPLC.OnRamp where
 import           GHC.Generics                 (Generic)
 import           PlutusLedgerApi.V1.Interval  (after, before)
 import           PlutusLedgerApi.V3
-import           PlutusLedgerApi.V3.Contexts  (findOwnInput)
+import           PlutusLedgerApi.V3.Contexts  (findOwnInput, txSignedBy)
 import           PlutusTx                     (CompiledCode, compile,
                                                liftCodeDef, makeIsDataIndexed,
                                                makeLift, unsafeApplyCode)
@@ -41,22 +41,20 @@ data OnRampDatum = OnRampDatum
 makeIsDataIndexed ''OnRampDatum [('OnRampDatum,0)]
 
 data OnRampRedeemer
-  = Update BuiltinByteString  -- Signed updated datum by seller
+  = Update BuiltinByteString
   -- ^ Update the bid with the buyer's public key hash and the timelock.
   | Claim BuiltinByteString
   -- ^ Buyer claims the value.
   | Cancel
   -- ^ Seller cancels the value selling.
-  | Test
-  -- ^ Always succeeds, for testing.
   deriving stock (Generic, Show)
 
-makeIsDataIndexed ''OnRampRedeemer [('Cancel,0),('Update,1),('Claim,2),('Test,3)]
+makeIsDataIndexed ''OnRampRedeemer [('Cancel,0),('Update,1),('Claim,2)]
 
 -- | Plutus script for a trustless P2P on-ramp.
 {-# INLINABLE onRamp #-}
 onRamp :: OnRampParams -> OnRampRedeemer -> ScriptContext -> Bool
-onRamp _ (Update signed) ctx =
+onRamp _ (Update _signed) ctx =
   let
     -- Get the current on-ramp output
     (addr, val, dat) = case findOwnInput ctx of
@@ -91,8 +89,8 @@ onRamp _ Cancel ctx =
       _ -> traceError "onRamp: missing input"
 
     -- Get the payment output
-    (addr', val') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
-      TxOut a v NoOutputDatum Nothing -> (a, v)
+    val' = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
+      TxOut _ v NoOutputDatum Nothing -> v
       _                               -> traceError "onRamp: missing output"
 
     -- Derive seller's pub key hash
@@ -101,10 +99,10 @@ onRamp _ Cancel ctx =
     -- The timelock is either not set or must be in the past
     maybe True (\t -> t `before` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat)
 
-    -- The value must be returned to the seller
-    && addr' == Address (PubKeyCredential $ PubKeyHash sellerPubKeyHash) Nothing
+    -- Seller must sign the Tx and reclaim all the locked value
+    && txSignedBy (scriptContextTxInfo ctx) (PubKeyHash sellerPubKeyHash)
     && val' == val
-onRamp OnRampParams{..} (Claim sig) ctx =
+onRamp OnRampParams{..} (Claim sig) ctx  =
   let
     -- Get the current on-ramp output
     (val, dat) = case findOwnInput ctx of
@@ -112,8 +110,8 @@ onRamp OnRampParams{..} (Claim sig) ctx =
       _ -> traceError "onRamp: missing input"
 
     -- Get the payment output
-    (addr', val') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
-      TxOut a v NoOutputDatum Nothing -> (a, v)
+    val' = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
+      TxOut _ v NoOutputDatum Nothing -> v
       _                               -> traceError "onRamp: missing output"
 
     -- Get the fee output
@@ -121,8 +119,8 @@ onRamp OnRampParams{..} (Claim sig) ctx =
       TxOut a v NoOutputDatum Nothing -> (a, v)
       _                               -> traceError "onRamp: missing output"
   in
-    -- The value must be sent to the buyer
-    maybe False (\a -> addr' == Address (PubKeyCredential a) Nothing) (buyerPubKeyHash dat)
+    -- Buyer must sign the Tx and claim all the locked value
+    maybe False (txSignedBy $ scriptContextTxInfo ctx) (buyerPubKeyHash dat)
     && val' == val
 
     -- The fiat payment processor must sign the hash of the fiat payment info
@@ -132,7 +130,6 @@ onRamp OnRampParams{..} (Claim sig) ctx =
     -- The fee must be sent to the fee address
     && addr'' == feeAddress
     && val'' == feeValue
-onRamp _ Test _ = True
 
 {-# INLINABLE untypedOnRamp #-}
 untypedOnRamp :: OnRampParams -> BuiltinData -> BuiltinUnit

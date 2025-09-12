@@ -5,6 +5,8 @@
 
 module P2POnRamp.Api.Seller where
 
+import           Cardano.Api                   (prettyPrintJSON)
+import           Control.Monad                 (void)
 import           Control.Exception             (throwIO)
 import           Data.Aeson                    (FromJSON (..), ToJSON (..), object, withObject, (.=), (.:))
 import qualified Data.Aeson                    as Aeson
@@ -14,6 +16,9 @@ import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Char8         as BSC
 import qualified Data.ByteString.Base16        as B16
 import qualified Data.ByteString.Lazy          as LBS
+import           Data.Default
+import           Data.List                     (find)
+import           Data.Maybe                    (isJust, isNothing)
 import           Data.String                   (fromString)
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
@@ -31,13 +36,15 @@ import           System.FilePath               ((</>))
 import           Crypto.Error                  (CryptoFailable(..))
 import qualified Crypto.PubKey.Ed25519         as Ed25519
 
-import           P2POnRamp.Api.Context         (Ctx (..), dbFile, readDB)
-import           P2POnRamp.Api.Tx              (UnsignedTxResponse (..))
-import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder, setSellPostTxIfNull, DB (..))
+import           P2POnRamp.Api.Context         (Ctx (..), dbFile, onRampPolicy, readDB)
+import           P2POnRamp.Api.Tx              (UnsignedTxResponse (..), AddSubmitParams (..), SubmitTxResult (..), txBodySubmitTxResult, unSignedTxWithFee)
+import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder, setSellPostTxIfNull, DB (..), setCompletedIfNull)
+import qualified P2POnRamp.OrdersDB            as DB (CompletedType (Cancel))
+import           P2POnRamp.Utils               (readOnRampDatum)
 import           ZkFold.Cardano.Crypto.Utils   (eitherHexToKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToJSON)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..), OnRampRedeemer (..))
 
 expectedMessage :: ByteString
 expectedMessage = "Hello messenger."
@@ -117,7 +124,7 @@ handleSigned = pure
 
 
 --------------------------------------------------------------------------------
--- Handlers: seller data
+-- Handler: seller data
 
 data SellerData = SellerData
   { sdName          :: Text
@@ -149,10 +156,10 @@ instance FromJSON NewOrder
 instance ToJSON NewOrder
 
 handleSellerData :: FilePath -> SellerData -> IO NewOrder
-handleSellerData path seller = do
-  let sellerInfo  = SellerInfo (sdName seller) (sdAccount seller)
+handleSellerData path SellerData{..} = do
+  let sellerInfo  = SellerInfo sdName sdAccount
       sellerVKeyE = do
-        pkBytes <- eitherHexToKey . T.unpack $ sdSellerPKBytes seller
+        pkBytes <- eitherHexToKey $ T.unpack sdSellerPKBytes
         case Ed25519.publicKey pkBytes of
           CryptoPassed vk -> Right vk
           CryptoFailed _  -> Left "Malformed public key"
@@ -161,28 +168,87 @@ handleSellerData path seller = do
     Left err -> badRequest err
     Right sellerVKey -> do
       let paymentInfoHash   = dataToBlake $ fromSellerInfo sellerInfo
-          sellPriceUsd      = sdPrice seller
-          valueSold         = lovelaceValue . Lovelace $ sdSellAda seller
+          sellPriceUsd      = sdPrice
+          valueSold         = lovelaceValue . Lovelace $ sdSellAda * 1000000
           sellerPubKeyBytes = toBuiltin @BS.ByteString . BA.convert $ sellerVKey
       
       let sellerDatum = OnRampDatum paymentInfoHash sellPriceUsd valueSold sellerPubKeyBytes Nothing Nothing
 
-      newOrderID <- createOrder (path </> dbFile) sellerInfo
+      BS.writeFile (path </> "sellerDatum.json") . prettyPrintJSON $ dataToJSON sellerDatum
 
-      return $ NewOrder (orderID newOrderID) (dataToJSON sellerDatum)
+      newOrder <- createOrder (path </> dbFile) sellerInfo
+
+      return $ NewOrder (orderID newOrder) (dataToJSON sellerDatum)
 
 
 --------------------------------------------------------------------------------
--- Handlers: put seller's Tx
+-- Handlers: seller's Tx
 
-data SellerTx = SellerTx { stID :: Int, stTx :: Text }
-  deriving (Show, Generic)
+data SellerTx = SellerTx
+  { stSellerAddrs :: ![GYAddress]
+  , stChangeAddr  :: !GYAddress
+  } deriving (Show, Generic)
 
 instance FromJSON SellerTx
-instance ToJSON SellerTx
 
-handleSellerTx :: FilePath -> SellerTx -> IO Bool
-handleSellerTx path SellerTx{..} = setSellPostTxIfNull (path </> dbFile) stID stTx
+handleBuildSellTx :: Ctx -> FilePath -> SellerTx -> IO UnsignedTxResponse
+handleBuildSellTx Ctx{..} path SellerTx{..} = do
+  let nid           = cfgNetworkId ctxCoreCfg
+      providers     = ctxProviders
+      sellerAddress = head stSellerAddrs
+      onRampScriptE = onRampPolicy ctxOnRampParams
+
+  onRampScript <- case onRampScriptE of
+    Left err     -> internalErr err
+    Right script -> pure script
+
+  let onRampAddr = addressFromValidator nid onRampScript
+
+  sellerPKH <- addressToPubKeyHashIO sellerAddress
+
+  onRampDatumE <- readOnRampDatum (path </> "sellerDatum.json")
+  onRampDatum <- case onRampDatumE of
+    Left err -> internalErr $ "Unable to retrieve datum: " ++ err
+    Right d  -> pure d
+
+  sellValue <- case valueFromPlutus $ valueSold onRampDatum of
+    Left err -> internalErr $ "Unable to retrieve value sold: " ++ (show err)
+    Right v  -> pure v
+
+  let inlineDatum = Just ( datumFromPlutusData $ toBuiltinData onRampDatum
+                         , GYTxOutUseInlineDatum @PlutusV3
+                         )
+
+  let skeleton = mustHaveOutput (GYTxOut onRampAddr sellValue inlineDatum Nothing)
+              <> mustBeSignedBy sellerPKH
+
+  txBody <- runGYTxBuilderMonadIO nid
+                                  providers
+                                  stSellerAddrs
+                                  stChangeAddr
+                                  Nothing $
+                                  buildTxBody skeleton
+
+  return $ unSignedTxWithFee txBody
+
+-- -- | Submit parameters to add for witness and order Id for seller Tx.
+-- data AddSellSubmitParams = AddSellSubmitParams
+--   { asspTxUnsigned :: !GYTx
+--   , asspTxWit      :: !GYTxWitness
+--   , asspOrderID    :: !Int
+--   } deriving Generic
+
+-- instance FromJSON AddSellSubmitParams
+
+-- | Add key witness to the unsigned tx, submit tx and store txid.
+handleSubmitSellTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult
+handleSubmitSellTx Ctx{..} path AddSubmitParams{..} = do
+  let txBody = getTxBody aspTxUnsigned
+  txid <- gySubmitTx ctxProviders $ makeSignedTransaction aspTxWit txBody
+  void $ gyAwaitTxConfirmed ctxProviders def txid
+  let submitResult = txBodySubmitTxResult txBody
+  void . setSellPostTxIfNull (path </> dbFile) aspOrderID . T.pack $ show txid
+  return submitResult
 
 
 --------------------------------------------------------------------------------
@@ -197,9 +263,10 @@ instance FromJSON OrderPair
 instance ToJSON OrderPair
 
 data SellOrder = SellOrder
-  { soOrderID :: Int
-  , soInfo    :: SellerInfo
-  , soPair    :: Maybe OrderPair
+  { soOrderID  :: Int
+  , soHasBuyer :: Bool
+  , soInfo     :: SellerInfo
+  , soPair     :: Maybe OrderPair
   } deriving (Show, Eq, Generic)
 
 instance FromJSON SellOrder
@@ -207,11 +274,11 @@ instance ToJSON SellOrder
 
 filterOrdersBySell :: [Order] -> [(GYTxOutRef, SellOrder)]
 filterOrdersBySell os =
-  [ (fromString $ T.unpack txid ++ "#0", SellOrder orderID sellerInfo Nothing)
+  [ (fromString $ T.unpack txid ++ "#0", SellOrder orderID (isJust buyPostTx) sellerInfo Nothing)
   | Order{ orderID
          , sellerInfo
          , sellPostTx    = Just txid
-         , buyPostTx     = Nothing
+         , buyPostTx
          , completedData = Nothing
          } <- os
   ]
@@ -248,3 +315,85 @@ handleSellOrders ctx path = do
     Left err -> badRequest err
     Right db -> mapM (sellOrders ctx) (filterOrdersBySell $ orders db)
       
+data CancelOrder = CancelOrder
+  { coSellerAddrs :: ![GYAddress]
+  , coChangeAddr  :: !GYAddress
+  , coOrderID     :: !Int
+  } deriving (Show, Generic)
+
+instance FromJSON CancelOrder
+
+handleBuildCancelTx :: Ctx -> FilePath -> CancelOrder -> IO UnsignedTxResponse
+handleBuildCancelTx Ctx{..} path CancelOrder{..} = do
+  dbE <- readDB (path </> dbFile)
+  case dbE of
+    Left err -> internalErr err
+    Right db -> do
+      let nid           = cfgNetworkId ctxCoreCfg
+          providers     = ctxProviders
+          sellerAddress = head coSellerAddrs
+          onRampScriptE = onRampPolicy ctxOnRampParams
+
+      onRampScript <- case onRampScriptE of
+        Left err     -> internalErr err
+        Right script -> pure script
+
+      let req :: Order -> Bool
+          req o = orderID o == coOrderID && isNothing (completedData o)  -- ToDo: add requirement of having been signed
+      selectedTxId <- case find req $ orders db of
+        Nothing -> notFoundErr "Order not found."
+        Just o  -> case buyPostTx o of
+          Just txid -> pure txid
+          Nothing   -> case sellPostTx o of
+            Nothing   -> notFoundErr "Sell order not yet onchain."
+            Just txid -> pure txid
+
+      let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
+
+      mutxo <- runGYTxQueryMonadIO nid
+                                   providers $
+                                   utxoAtTxOutRef selectedOref
+      selectedUtxo <- case mutxo of
+                        Nothing -> notFoundErr "Missing UTxO for selected order"
+                        Just u  -> pure u
+
+      sellerPKH <- addressToPubKeyHashIO sellerAddress
+
+      let redeemer = redeemerFromPlutusData . toBuiltinData $ Cancel
+
+      let onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
+          onRampWit          = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
+
+      let skeleton' = mustHaveInput (GYTxIn selectedOref onRampWit)
+                   <> mustHaveOutput (GYTxOut sellerAddress (utxoValue selectedUtxo) Nothing Nothing)
+                   <> mustBeSignedBy sellerPKH
+
+      txBody <- runGYTxBuilderMonadIO nid
+                                      providers
+                                      coSellerAddrs
+                                      coChangeAddr
+                                      Nothing $ do
+        cslot <- slotOfCurrentBlock
+        let skeleton = skeleton' <> isInvalidBefore cslot
+        buildTxBody skeleton
+
+      return $ unSignedTxWithFee txBody
+
+-- -- | Submit parameters to add for witness and order Id.  Assumption: frontend
+-- -- honestly sends the correct order ID.
+-- data AddCancelSubmitParams = AddCancelSubmitParams
+--   { acspTxUnsigned :: !GYTx
+--   , acspTxWit      :: !GYTxWitness
+--   , acspOrderID    :: !Int
+--   } deriving Generic
+
+-- instance FromJSON AddCancelSubmitParams
+
+handleSubmitCancelTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult
+handleSubmitCancelTx Ctx{..} path AddSubmitParams{..} = do
+  let txBody = getTxBody aspTxUnsigned
+  txid <- gySubmitTx ctxProviders $ makeSignedTransaction aspTxWit txBody
+  void $ gyAwaitTxConfirmed ctxProviders def txid
+  let submitResult = txBodySubmitTxResult txBody
+  void . setCompletedIfNull (path </> dbFile) aspOrderID DB.Cancel . T.pack $ show txid
+  return submitResult

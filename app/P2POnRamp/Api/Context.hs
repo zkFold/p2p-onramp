@@ -43,16 +43,23 @@ data OnRampParams' = OnRampParams'
 
 instance FromJSON OnRampParams'
 
--- | Minting policy from OnRamp parameters decoded from JSON
--- onRampPolicy :: OnRampParams' -> Either String (GYBuildScript PlutusV3)
-onRampPolicy :: OnRampParams' -> Either String (GYScript PlutusV3)
-onRampPolicy orParams' = do
-  feeAddr <- parseAddress $ orpFeeAddress orParams'
+-- | Decode OnRamp parameters from JSON
+decodeOnRampParams :: OnRampParams' -> Either String OnRampParams
+decodeOnRampParams orParams' = do
+  feeAddr    <- parseAddress $ orpFeeAddress orParams'
   feePKBytes <- hexToBuiltin $ orpFiatPubKeyBytes orParams'
   let feeVal = lovelaceValue . Lovelace $ orpFeeValue orParams'
-      orParams = OnRampParams feeAddr feeVal feePKBytes
-      mintScript = scriptFromPlutus @PlutusV3 $ onRampCompiled orParams
-  -- return $ GYMintScript @PlutusV3 mintScript
+  return $ OnRampParams feeAddr feeVal feePKBytes
+
+-- | Minting policy from OnRamp parameters decoded from JSON
+onRampPolicy :: OnRampParams' -> Either String (GYScript PlutusV3)
+onRampPolicy orParams' = do
+  -- feeAddr <- parseAddress $ orpFeeAddress orParams'
+  -- feePKBytes <- hexToBuiltin $ orpFiatPubKeyBytes orParams'
+  -- let feeVal = lovelaceValue . Lovelace $ orpFeeValue orParams'
+  --     orParams = OnRampParams feeAddr feeVal feePKBytes
+  orParams <- decodeOnRampParams orParams'
+  let mintScript = scriptFromPlutus @PlutusV3 $ onRampCompiled orParams
   return mintScript
 
 ------------------------- :Context & Setup: -------------------------

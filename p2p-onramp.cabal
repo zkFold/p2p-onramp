@@ -210,7 +210,8 @@ executable p2p-server
     other-modules:
       P2POnRamp.Api
       P2POnRamp.Api.Addr
-      P2POnRamp.Api.Buyer
+      P2POnRamp.Api.BuyerCommit
+      P2POnRamp.Api.BuyerClaim
       P2POnRamp.Api.Context
       P2POnRamp.Api.Seller
       P2POnRamp.Api.Tx
