@@ -307,6 +307,9 @@ handleSellOrders ctx path = do
     Right db -> mapM (sellOrders ctx) (filterOrdersBySell $ orders db)
       
 
+--------------------------------------------------------------------------------
+-- Handler: cancel order
+
 data CancelOrder = CancelOrder
   { coSellerAddrs :: ![GYAddress]
   , coChangeAddr  :: !GYAddress
@@ -356,18 +359,18 @@ handleBuildCancelTx Ctx{..} path CancelOrder{..} = do
 
       let mt1 = do
             let dat = outDatumToPlutus $ utxoOutDatum selectedUtxo
-            orDat' <- case dat of
+            orDat'       <- case dat of
               OutputDatum d -> Just $ getDatum d
               _             -> Nothing
-            orDat  <- fromBuiltinData @OnRampDatum orDat'
-            t1'    <- timelock orDat
-            return $ timeFromPlutus t1'
+            orDat        <- fromBuiltinData @OnRampDatum orDat'
+            POSIXTime t1 <- timelock orDat
+            return $ t1
 
       t0' <- getCurrentGYTime
-      let t0 = addSeconds t0' $ fromInteger 30
+      let timePadding = 30000  -- 30 seconds
+          t0          = (posixToMillis $ timeToPOSIX t0') - timePadding
       case mt1 of
-        Just t1 | t0 <= t1 -> return . COFail . fromInteger $ f t1 - f t0
-                where f = posixToMillis . timeToPOSIX
+        Just t1 | t0 <= t1 -> return . COFail . fromInteger $ t1 - t0
 
         _ -> do
           sellerPKH <- addressToPubKeyHashIO sellerAddress
