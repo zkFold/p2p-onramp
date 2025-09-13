@@ -238,6 +238,7 @@ executable p2p-server
       servant                        ,
       servant-server                 ,
       text                           ,
+      time                           ,
       transformers                   ,
       unix                           ,
       wai                            ,

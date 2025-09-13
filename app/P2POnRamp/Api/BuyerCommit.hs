@@ -110,16 +110,6 @@ handleBuyerCommit Ctx{..} path bc@BuyCommit{..} = do
 
       return bc
 
--- data BuyCommitHash = BuyCommitHash { hex :: T.Text }
---   deriving (Show, Generic)
-
--- instance ToJSON BuyCommitHash
-
--- handleBuyCommitHash :: FilePath -> IO BuyCommitHash
--- handleBuyCommitHash path = do
---   bs <- BS.readFile (path </> "buyerCommit.bin")
---   return . BuyCommitHash . TE.decodeUtf8 $ B16.encode bs
-
 handleBuildBuyTx :: Ctx -> FilePath -> BuyCommit -> IO UnsignedTxResponse
 handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
   dbE <- readDB (path </> dbFile)

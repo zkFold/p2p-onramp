@@ -23,6 +23,7 @@ import           Data.String                   (fromString)
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
+-- import qualified Data.Time.Clock.POSIX         as Clock (getPOSIXTime)
 import           GeniusYield.GYConfig          (GYCoreConfig (..))
 import           GeniusYield.Types
 import           GeniusYield.TxBuilder
@@ -40,7 +41,7 @@ import           P2POnRamp.Api.Context         (Ctx (..), dbFile, onRampPolicy, 
 import           P2POnRamp.Api.Tx              (UnsignedTxResponse (..), AddSubmitParams (..), SubmitTxResult (..), txBodySubmitTxResult, unSignedTxWithFee)
 import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder, setSellPostTxIfNull, DB (..), setCompletedIfNull)
 import qualified P2POnRamp.OrdersDB            as DB (CompletedType (Cancel))
-import           P2POnRamp.Utils               (readOnRampDatum)
+import           P2POnRamp.Utils               (posixToMillis, readOnRampDatum)
 import           ZkFold.Cardano.Crypto.Utils   (eitherHexToKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToJSON)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
@@ -356,6 +357,20 @@ handleBuildCancelTx Ctx{..} path CancelOrder{..} = do
       selectedUtxo <- case mutxo of
                         Nothing -> notFoundErr "Missing UTxO for selected order"
                         Just u  -> pure u
+
+      -- let morDat = do
+      --   let dat = outDatumToPlutus $ utxoOutDatum selectedUtxo
+      --   orDat' <- case dat of
+      --     OutputDatum d -> Just $ getDatum d
+      --     _             -> Nothing
+      --   orDat  <- fromBuiltinData @OnRampDatum orDat'
+      --   pure orDat
+
+--      currentTime <- Clock.getPOSIXTime
+      currentTime' <- getCurrentGYTime
+--      putStrLn $ "\n" ++ (show $ posixToMillis currentTime) ++ "\n"
+      putStrLn $ show $ timeToPOSIX currentTime'
+      putStrLn $ show $ posixToMillis $ timeToPOSIX currentTime'
 
       sellerPKH <- addressToPubKeyHashIO sellerAddress
 
