@@ -2,23 +2,21 @@
 
 module P2POnRamp.Utils where
 
--- import qualified Data.ByteString         as BS
-import           Data.Aeson              (eitherDecode)
-import           Cardano.Api             (getScriptData)
-import           Cardano.Api.Shelley     (toPlutusData, scriptDataFromJsonDetailedSchema)
-import qualified Data.ByteString.Base16  as B16
-import qualified Data.ByteString.Char8   as C8
-import qualified Data.ByteString.Lazy    as LBS
-import           Data.Fixed              (Pico)
-import qualified Data.Text               as T
-import qualified Data.Text.Encoding      as TE
-import qualified Data.Time.Clock.POSIX   as Clock (POSIXTime)
-import           Data.Time.Clock         (nominalDiffTimeToSeconds)
--- import           PlutusTx.Builtins       (toBuiltin)
-import           PlutusLedgerApi.V3            as V3
+import           Data.Aeson                 (eitherDecode)
+import           Cardano.Api                (getScriptData)
+import           Cardano.Api.Shelley        (toPlutusData, scriptDataFromJsonDetailedSchema)
+import qualified Data.ByteString.Base16     as B16
+import qualified Data.ByteString.Char8      as C8
+import qualified Data.ByteString.Lazy       as LBS
+import           Data.Fixed                 (Pico)
+import qualified Data.Text                  as T
+import qualified Data.Text.Encoding         as TE
+import qualified Data.Time.Clock.POSIX      as Clock (POSIXTime)
+import           Data.Time.Clock            (nominalDiffTimeToSeconds)
+import           PlutusLedgerApi.V3         as V3
 import           Prelude
 
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..))
+import           ZkFold.Cardano.UPLC.OnRamp (OnRampDatum (..))
 
 
 -- | Decode hex-encoded String into BuiltinByteString

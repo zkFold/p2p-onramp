@@ -318,7 +318,8 @@ data CancelOrder = CancelOrder
 
 instance FromJSON CancelOrder
 
-data CancelOrderResponse = COFail Natural | COSucc UnsignedTxResponse
+data CancelOrderResponse = COFail Natural  -- Too early to cancel (milliseconds remaining)
+                         | COSucc UnsignedTxResponse
   deriving (Show, Generic)
 
 instance ToJSON CancelOrderResponse
