@@ -146,9 +146,6 @@ handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
 
       onRampDatumUpdated <- updateDatum selectedUtxo buyerPKH timeInc
 
-      -- let orDatUpdatedHash = fromBuiltin $ dataToBlake onRampDatumUpdated  -- DEBUG: testing
-      -- BS.writeFile (path </> "buyerCommit.bin") orDatUpdatedHash           -- DEBUG: testing
-
       let inlineDatumNew = Just ( datumFromPlutusData $ toBuiltinData onRampDatumUpdated
                                 , GYTxOutUseInlineDatum @PlutusV3
                                 )
