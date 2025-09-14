@@ -7,6 +7,7 @@ module P2POnRamp.OrdersDB
   ( CompletedType(..)
   , CompletedData(..)
   , SellerInfo(..)
+  , IniInfo(..)
   , Order(..)
   , DB(..)
   , initDB
@@ -14,6 +15,7 @@ module P2POnRamp.OrdersDB
   , createOrder
   , setSellPostTxIfNull
   , setBuyPostTxIfNull
+  , setFiatSignatureIfNull
   , setCompletedIfNull
   ) where
 
@@ -30,8 +32,6 @@ import           Prelude
 import           System.Directory          (doesFileExist, removeFile, renameFile)
 import           System.FilePath           (takeDirectory, takeFileName)
 import           System.IO                 (hClose, hFlush, openBinaryTempFile)
-
--- POSIX: fsync for file and parent directory
 import           Foreign.C.Error           (throwErrnoIfMinus1_)
 import           Foreign.C.Types           (CInt(..))
 import           System.Posix.IO           (OpenMode(ReadOnly, ReadWrite),
@@ -83,11 +83,19 @@ data SellerInfo = SellerInfo
   , sellerAccount :: Text
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
+data IniInfo = IniInfo
+  { iiSellAda       :: Integer
+  , iiPriceUsd      :: Integer
+  , iiSellerPKBytes :: Text
+  } deriving (Show, Eq, Generic, ToJSON, FromJSON)
+
 data Order = Order
   { orderID       :: Int
   , sellerInfo    :: SellerInfo
+  , iniInfo       :: IniInfo
   , sellPostTx    :: Maybe Text
   , buyPostTx     :: Maybe Text
+  , fiatSignature :: Maybe Text
   , completedData :: Maybe CompletedData
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
@@ -148,10 +156,10 @@ writeJSONAtomic target bs = do
         BL.hPut h bs
         hFlush h
         fd <- handleToFd h
-        fsyncFd fd      -- flush file content + metadata
-        closeFd fd      -- also closes handle
+        fsyncFd fd                 -- flush file content + metadata
+        closeFd fd                 -- also closes handle
         renameFile tmpPath target  -- atomic on same filesystem
-        fsyncDir dir    -- persist the directory entry (rename)
+        fsyncDir dir               -- persist the directory entry (rename)
     )
   where
     safeRemove p = void (try (removeFile p) :: IO (Either IOException ()))
@@ -187,25 +195,27 @@ readOrdersDB :: FilePath -> IO [Order]
 readOrdersDB path = orders <$> loadDB path
 
 -- Create a new empty order (null fields start as Nothing)
-createOrder :: FilePath -> SellerInfo -> IO Order
-createOrder path seller = withFileLock path $ do
+createOrder :: FilePath -> SellerInfo -> IniInfo -> IO Order
+createOrder path seller ini = withFileLock path $ do
   db  <- loadDB path
   let oid   = nextOrderID db
       order = Order
         { orderID       = oid
         , sellerInfo    = seller
+        , iniInfo       = ini
         , sellPostTx    = Nothing
         , buyPostTx     = Nothing
+        , fiatSignature = Nothing
         , completedData = Nothing
         }
       db' = db { nextOrderID = oid + 1, orders = orders db ++ [order] }
   saveDB path db'
   pure order
 
--- Update helpers: update an order by ID, but only fill fields that are currently Nothing
+-- Update helpers: update an order by ID, but only if it changed
 updateOrderIf :: FilePath
               -> Int
-              -> (Order -> (Order, Bool)) -- returns (updatedOrder, didChange)
+              -> (Order -> (Order, Bool))  -- returns (updatedOrder, didChange)
               -> IO Bool                   -- True if the DB changed
 updateOrderIf path oid upd = withFileLock path $ do
   db <- loadDB path
@@ -240,6 +250,14 @@ setBuyPostTxIfNull path oid tx =
   updateOrderIf path oid $ \o ->
     if isNothing (buyPostTx o)
       then (o { buyPostTx = Just tx }, True)
+      else (o, False)
+
+-- Only set fiatSignature if it is currently Nothing
+setFiatSignatureIfNull :: FilePath -> Int -> Text -> IO Bool
+setFiatSignatureIfNull path oid sigHex =
+  updateOrderIf path oid $ \o ->
+    if isNothing (fiatSignature o)
+      then (o { fiatSignature = Just sigHex }, True)
       else (o, False)
 
 -- Only set completedData if it is currently Nothing

@@ -8,12 +8,12 @@ import           Control.Monad                 (void)
 import           Crypto.PubKey.Ed25519
 import           Data.Aeson
 import qualified Data.ByteArray                as BA
-import qualified Data.ByteString               as BS
+-- import qualified Data.ByteString               as BS
 import           Data.Default
-import           Data.Maybe                    (isJust, isNothing)
+import           Data.Maybe                    (fromJust, isJust, isNothing)
 import           Data.List                     (find)
 import           Data.String                   (fromString)
-import qualified Data.ByteString.Base16        as B16
+-- import qualified Data.ByteString.Base16        as B16
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           GeniusYield.GYConfig                   (GYCoreConfig (..))
@@ -28,9 +28,9 @@ import           System.FilePath               ((</>))
 
 import           P2POnRamp.Api.Context         (Ctx (..), dbFile, internalErr, notFoundErr, decodeOnRampParams, readDB)
 import           P2POnRamp.Api.Tx              (AddSubmitParams (..), SubmitTxResult (..), UnsignedTxResponse, txBodySubmitTxResult, unSignedTxWithFee)
-import           P2POnRamp.OrdersDB            (DB (..), Order (..), SellerInfo (..), setCompletedIfNull)
+import           P2POnRamp.OrdersDB            (DB (..), Order (..), SellerInfo (..), setCompletedIfNull, setFiatSignatureIfNull)
 import qualified P2POnRamp.OrdersDB            as DB (CompletedType (Claim))
--- import           P2POnRamp.Utils               (hexToBuiltin)
+import           P2POnRamp.Utils               (hexToBuiltin', toHexText)
 import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..), OnRampRedeemer (..), onRampCompiled)
@@ -69,7 +69,8 @@ handleFiatSign path FiatVerify{..} = do
   case dbE of
     Left err -> internalErr err
     Right db -> do
-      let req o = orderID o == fvOrderID && isJust (buyPostTx o) && isNothing (completedData o)
+      let req :: Order -> Bool
+          req o = orderID o == fvOrderID && isJust (buyPostTx o) && isNothing (completedData o)
       sellerInfo <- case find req $ orders db of
                       Nothing -> notFoundErr "Sell order not found"
                       Just o  -> pure $ sellerInfo o
@@ -78,12 +79,15 @@ handleFiatSign path FiatVerify{..} = do
       case skFiatE of
         Left err     -> internalErr err
         Right skFiat -> do
-          let vkFiat = toPublic skFiat
-          let infoHash = dataToBlake $ fromSellerInfo sellerInfo
-              sig = sign skFiat vkFiat . fromBuiltin . dataToBlake $ infoHash
+          let vkFiat   = toPublic skFiat
+              infoHash = dataToBlake $ fromSellerInfo sellerInfo
+              sig      = sign skFiat vkFiat . fromBuiltin . dataToBlake $ infoHash
+              sigHex   = toHexText $ BA.convert sig
 
-          BS.writeFile (path </> "fiatSignature.bin") $ BA.convert sig
-          return . FiatVerified . TE.decodeUtf8 . B16.encode $ BA.convert sig
+          void $ setFiatSignatureIfNull path fvOrderID sigHex
+          -- BS.writeFile (path </> "fiatSignature.bin") $ BA.convert sig
+          -- return . FiatVerified . TE.decodeUtf8 . B16.encode $ BA.convert sig
+          return $ FiatVerified sigHex
 
 data ClaimCrypto = ClaimCrypto
   { ccBuyerAddrs :: ![GYAddress]
@@ -115,13 +119,17 @@ handleBuildClaimTx Ctx{..} path ClaimCrypto{..} = do
         Left err -> internalErr err
         Right (onRampParams, feeAddress', feeValue') -> do
           let req :: Order -> Bool
-              req o = orderID o == ccOrderID && isJust (buyPostTx o) &&
-                      isNothing (completedData o)  -- ToDo: add requirement of having been signed
-          selectedTxId <- case find req $ orders db of
-                            Nothing -> notFoundErr "Buy order not found."
-                            Just o  -> case buyPostTx o of
-                              Nothing   -> notFoundErr "Buy order not yet onchain."
-                              Just txid -> pure txid
+              req o = orderID o == ccOrderID && isJust (buyPostTx o)
+                      && isJust (fiatSignature o) && isNothing (completedData o)
+          (selectedTxId, fiatSig) <- case find req $ orders db of
+            Nothing -> notFoundErr "Buy order not found."
+            Just o  -> do
+              let txid = fromJust $ buyPostTx o
+
+              sig <- case hexToBuiltin' . fromJust $ fiatSignature o of
+                       Left err -> internalErr $ "Corrupted signature: " ++ err
+                       Right s  -> pure s
+              return (txid, sig)
 
           let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
 
@@ -133,9 +141,6 @@ handleBuildClaimTx Ctx{..} path ClaimCrypto{..} = do
                             Just u  -> pure u
 
           buyerPKH <- addressToPubKeyHashIO buyerAddress
-
-          fiatSig' <- BS.readFile (path </> "fiatSignature.bin")  -- ToDo: incorporate in DB
-          let fiatSig = toBuiltin fiatSig'
 
           let redeemer = redeemerFromPlutusData . toBuiltinData $ Claim fiatSig
 
@@ -156,16 +161,6 @@ handleBuildClaimTx Ctx{..} path ClaimCrypto{..} = do
                                           buildTxBody skeleton
 
           return $ unSignedTxWithFee txBody
-
--- -- | Submit parameters to add for witness and order Id.  Assumption: frontend
--- -- honestly sends the correct order ID.
--- data AddClaimSubmitParams = AddClaimSubmitParams
---   { acspTxUnsigned :: !GYTx
---   , acspTxWit      :: !GYTxWitness
---   , acspOrderID    :: !Int
---   } deriving Generic
-
--- instance FromJSON AddClaimSubmitParams
 
 handleSubmitClaimTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult
 handleSubmitClaimTx Ctx{..} path AddSubmitParams{..} = do

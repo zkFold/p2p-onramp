@@ -5,7 +5,6 @@
 
 module P2POnRamp.Api.Seller where
 
-import           Cardano.Api                   (prettyPrintJSON)
 import           Control.Monad                 (void)
 import           Control.Exception             (throwIO)
 import           Data.Aeson                    (FromJSON (..), ToJSON (..), object, withObject, (.=), (.:))
@@ -38,9 +37,10 @@ import qualified Crypto.PubKey.Ed25519         as Ed25519
 
 import           P2POnRamp.Api.Context         (Ctx (..), dbFile, onRampPolicy, readDB)
 import           P2POnRamp.Api.Tx              (UnsignedTxResponse (..), AddSubmitParams (..), SubmitTxResult (..), txBodySubmitTxResult, unSignedTxWithFee)
-import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder, setSellPostTxIfNull, DB (..), setCompletedIfNull)
+import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), IniInfo (..),
+                                                createOrder, setSellPostTxIfNull, DB (..), setCompletedIfNull)
 import qualified P2POnRamp.OrdersDB            as DB (CompletedType (Cancel))
-import           P2POnRamp.Utils               (posixToMillis, readOnRampDatum)
+import           P2POnRamp.Utils               (hexToBuiltin', posixToMillis, toHexText)
 import           ZkFold.Cardano.Crypto.Utils   (eitherHexToKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToJSON)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
@@ -144,21 +144,32 @@ data SellerInfoBBS = SellerInfoBBS
 
 makeIsDataIndexed ''SellerInfoBBS [('SellerInfoBBS, 0)]
 
-fromSellerInfo :: SellerInfo -> SellerInfoBBS
-fromSellerInfo (SellerInfo nm acc) = SellerInfoBBS nm' acc'
-  where nm'  = toBuiltin $ TE.encodeUtf8 nm
-        acc' = toBuiltin $ TE.encodeUtf8 acc
-
 data NewOrder = NewOrder { newID :: Int, newDatum :: Aeson.Value }
   deriving (Show, Generic)
 
 instance FromJSON NewOrder
 instance ToJSON NewOrder
 
+fromSellerInfo :: SellerInfo -> SellerInfoBBS
+fromSellerInfo (SellerInfo nm acc) = SellerInfoBBS nm' acc'
+  where nm'  = toBuiltin $ TE.encodeUtf8 nm
+        acc' = toBuiltin $ TE.encodeUtf8 acc
+
+mkInitialDatum :: SellerInfo -> IniInfo -> IO OnRampDatum
+mkInitialDatum seller IniInfo{..} = do
+  let paymentInfoHash    = dataToBlake $ fromSellerInfo seller
+      sellPriceUsd       = iiPriceUsd
+      valueSold          = lovelaceValue . Lovelace $ iiSellAda * 1000000
+      sellerPubKeyBytesE = hexToBuiltin' iiSellerPKBytes
+
+  case sellerPubKeyBytesE of
+    Left err   -> badRequest err
+    Right spkb -> pure $
+      OnRampDatum paymentInfoHash sellPriceUsd valueSold spkb Nothing Nothing
+
 handleSellerData :: FilePath -> SellerData -> IO NewOrder
 handleSellerData path SellerData{..} = do
-  let sellerInfo  = SellerInfo sdName sdAccount
-      sellerVKeyE = do
+  let sellerVKeyE = do
         pkBytes <- eitherHexToKey $ T.unpack sdSellerPKBytes
         case Ed25519.publicKey pkBytes of
           CryptoPassed vk -> Right vk
@@ -167,16 +178,11 @@ handleSellerData path SellerData{..} = do
   case sellerVKeyE of
     Left err -> badRequest err
     Right sellerVKey -> do
-      let paymentInfoHash   = dataToBlake $ fromSellerInfo sellerInfo
-          sellPriceUsd      = sdPrice
-          valueSold         = lovelaceValue . Lovelace $ sdSellAda * 1000000
-          sellerPubKeyBytes = toBuiltin @BS.ByteString . BA.convert $ sellerVKey
-      
-      let sellerDatum = OnRampDatum paymentInfoHash sellPriceUsd valueSold sellerPubKeyBytes Nothing Nothing
+      let sellerInfo = SellerInfo sdName sdAccount
+          iniInfo    = IniInfo sdSellAda sdPrice . toHexText $ BA.convert sellerVKey
 
-      BS.writeFile (path </> "sellerDatum.json") . prettyPrintJSON $ dataToJSON sellerDatum
-
-      newOrder <- createOrder (path </> dbFile) sellerInfo
+      sellerDatum <- mkInitialDatum sellerInfo iniInfo
+      newOrder    <- createOrder (path </> dbFile) sellerInfo iniInfo
 
       return $ NewOrder (orderID newOrder) (dataToJSON sellerDatum)
 
@@ -187,49 +193,57 @@ handleSellerData path SellerData{..} = do
 data SellerTx = SellerTx
   { stSellerAddrs :: ![GYAddress]
   , stChangeAddr  :: !GYAddress
+  , stOrderID     :: !Int
   } deriving (Show, Generic)
 
 instance FromJSON SellerTx
 
 handleBuildSellTx :: Ctx -> FilePath -> SellerTx -> IO UnsignedTxResponse
 handleBuildSellTx Ctx{..} path SellerTx{..} = do
-  let nid           = cfgNetworkId ctxCoreCfg
-      providers     = ctxProviders
-      sellerAddress = head stSellerAddrs
-      onRampScriptE = onRampPolicy ctxOnRampParams
+  dbE <- readDB (path </> dbFile)
+  case dbE of
+    Left err -> internalErr err
+    Right db -> do
+      let nid           = cfgNetworkId ctxCoreCfg
+          providers     = ctxProviders
+          sellerAddress = head stSellerAddrs
+          onRampScriptE = onRampPolicy ctxOnRampParams
 
-  onRampScript <- case onRampScriptE of
-    Left err     -> internalErr err
-    Right script -> pure script
+      onRampScript <- case onRampScriptE of
+        Left err     -> internalErr err
+        Right script -> pure script
 
-  let onRampAddr = addressFromValidator nid onRampScript
+      let onRampAddr = addressFromValidator nid onRampScript
 
-  sellerPKH <- addressToPubKeyHashIO sellerAddress
+      let req :: Order -> Bool
+          req o = orderID o == stOrderID && isNothing (sellPostTx o)
+      (sell, ini) <- case find req $ orders db of
+        Nothing -> notFoundErr "Order not found"
+        Just o  -> pure (sellerInfo o, iniInfo o)
 
-  onRampDatumE <- readOnRampDatum (path </> "sellerDatum.json")
-  onRampDatum <- case onRampDatumE of
-    Left err -> internalErr $ "Unable to retrieve datum: " ++ err
-    Right d  -> pure d
+      onRampDatum <- mkInitialDatum sell ini
 
-  sellValue <- case valueFromPlutus $ valueSold onRampDatum of
-    Left err -> internalErr $ "Unable to retrieve value sold: " ++ (show err)
-    Right v  -> pure v
+      sellValue <- case valueFromPlutus $ valueSold onRampDatum of
+        Left err -> internalErr $ "Unable to retrieve value sold: " ++ (show err)
+        Right v  -> pure v
 
-  let inlineDatum = Just ( datumFromPlutusData $ toBuiltinData onRampDatum
-                         , GYTxOutUseInlineDatum @PlutusV3
-                         )
+      let inlineDatum = Just ( datumFromPlutusData $ toBuiltinData onRampDatum
+                             , GYTxOutUseInlineDatum @PlutusV3
+                             )
 
-  let skeleton = mustHaveOutput (GYTxOut onRampAddr sellValue inlineDatum Nothing)
-              <> mustBeSignedBy sellerPKH
+      sellerPKH   <- addressToPubKeyHashIO sellerAddress
 
-  txBody <- runGYTxBuilderMonadIO nid
-                                  providers
-                                  stSellerAddrs
-                                  stChangeAddr
-                                  Nothing $
-                                  buildTxBody skeleton
+      let skeleton = mustHaveOutput (GYTxOut onRampAddr sellValue inlineDatum Nothing)
+                  <> mustBeSignedBy sellerPKH
 
-  return $ unSignedTxWithFee txBody
+      txBody <- runGYTxBuilderMonadIO nid
+                                      providers
+                                      stSellerAddrs
+                                      stChangeAddr
+                                      Nothing $
+                                      buildTxBody skeleton
+
+      return $ unSignedTxWithFee txBody
 
 -- | Add key witness to the unsigned tx, submit tx and store txid.
 handleSubmitSellTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult
@@ -342,11 +356,11 @@ handleBuildCancelTx Ctx{..} path CancelOrder{..} = do
       let req :: Order -> Bool
           req o = orderID o == coOrderID && isNothing (completedData o)
       selectedTxId <- case find req $ orders db of
-        Nothing -> notFoundErr "Order not found."
+        Nothing -> notFoundErr "Order not found"
         Just o  -> case buyPostTx o of
           Just txid -> pure txid
           Nothing   -> case sellPostTx o of
-            Nothing   -> notFoundErr "Sell order not yet onchain."
+            Nothing   -> notFoundErr "Sell order not yet onchain"
             Just txid -> pure txid
 
       let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
