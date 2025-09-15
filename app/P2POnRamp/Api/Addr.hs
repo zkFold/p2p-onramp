@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeOperators     #-}
 
 
 module P2POnRamp.Api.Addr where
 
-import           Control.Exception             (throwIO)
+import           Control.Exception     (throwIO)
 -- import           Control.Monad.IO.Class        (liftIO)
 -- import           Control.Monad                 (when)
 -- import           Data.Aeson                    (FromJSON (..), ToJSON (..), object, withObject, (.=), (.:))
@@ -13,13 +13,13 @@ import           Control.Exception             (throwIO)
 -- import qualified Data.ByteArray                as BA
 -- import           Data.ByteString               (ByteString)
 -- import qualified Data.ByteString               as BS
-import qualified Data.ByteString.Char8         as BSC
+import qualified Data.ByteString.Char8 as BSC
 -- import qualified Data.ByteString.Base16        as B16
-import qualified Data.ByteString.Lazy          as LBS
-import           Data.Text                     (Text)
+import qualified Data.ByteString.Lazy  as LBS
+import           Data.Text             (Text)
 -- import qualified Data.Text                     as T
 -- import qualified Data.Text.Encoding            as TE
-import           GeniusYield.GYConfig          (GYCoreConfig (..))
+import           GeniusYield.GYConfig  (GYCoreConfig (..))
 import           GeniusYield.Types
 -- import           GHC.Generics                  (Generic)
 -- import           PlutusLedgerApi.V1.Value      (lovelaceValue)
@@ -39,7 +39,7 @@ import           Servant
 -- import qualified Crypto.PubKey.Ed25519         as Ed25519
 import           Prelude
 
-import           P2POnRamp.Api.Context         (Ctx (..), onRampPolicy)
+import           P2POnRamp.Api.Context (Ctx (..), onRampPolicy)
 -- import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), createOrder)
 -- [maybe also remove hexToBuiltin']
 -- import           P2POnRamp.Utils               (hexToBuiltin')

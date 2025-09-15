@@ -1,7 +1,7 @@
 module P2POnRamp.Api.Tx where
 
 import           Data.Aeson
-import qualified Data.Text            as T
+import qualified Data.Text         as T
 import           GeniusYield.Types
 import           GHC.Generics
 import           Prelude

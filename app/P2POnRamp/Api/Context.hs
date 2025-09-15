@@ -4,23 +4,24 @@ module P2POnRamp.Api.Context where
 
 import           Control.Exception             (throwIO)
 import           Data.Aeson
-import qualified Data.ByteString.Lazy          as BL
 import qualified Data.ByteString.Char8         as BSC
+import qualified Data.ByteString.Lazy          as BL
 import qualified Data.ByteString.Lazy          as LBS
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           GeniusYield.GYConfig          (GYCoreConfig (..))
 import           GeniusYield.Types
 import           GHC.Generics
-import           PlutusLedgerApi.V3
 import           PlutusLedgerApi.V1.Value      (lovelaceValue)
+import           PlutusLedgerApi.V3
 import           Prelude
 import           Servant
 
 import           P2POnRamp.OrdersDB            (DB)
 import           P2POnRamp.Utils               (hexToBuiltin)
 import           ZkFold.Cardano.OffChain.Utils (parseAddress)
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..), onRampCompiled)
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..),
+                                                onRampCompiled)
 
 
 ---------------------------- :Orders DB: ----------------------------

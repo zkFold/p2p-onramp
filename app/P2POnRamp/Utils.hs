@@ -2,15 +2,15 @@
 
 module P2POnRamp.Utils where
 
-import qualified Data.ByteString            as BS
-import qualified Data.ByteString.Base16     as B16
-import qualified Data.ByteString.Char8      as C8
-import           Data.Fixed                 (Pico)
-import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as TE
-import qualified Data.Time.Clock.POSIX      as Clock (POSIXTime)
-import           Data.Time.Clock            (nominalDiffTimeToSeconds)
-import           PlutusLedgerApi.V3         as V3
+import qualified Data.ByteString        as BS
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8  as C8
+import           Data.Fixed             (Pico)
+import qualified Data.Text              as T
+import qualified Data.Text.Encoding     as TE
+import           Data.Time.Clock        (nominalDiffTimeToSeconds)
+import qualified Data.Time.Clock.POSIX  as Clock (POSIXTime)
+import           PlutusLedgerApi.V3     as V3
 import           Prelude
 
 

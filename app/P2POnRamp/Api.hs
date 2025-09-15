@@ -9,12 +9,25 @@ import           Network.Wai.Middleware.Cors
 import           Prelude
 import           Servant
 
-import           P2POnRamp.Api.Context        (Ctx (..))
-import           P2POnRamp.Api.BuyerCommit    (BuyCommit, handleBuildBuyTx, handleSubmitBuyTx)
-import           P2POnRamp.Api.BuyerClaim     (FiatVerify, FiatVerified, ClaimCrypto, ClaimCryptoResponse, handleFiatSign, handleBuildClaimTx, handleSubmitClaimTx)
-import           P2POnRamp.Api.Seller         (CancelOrder, CancelOrderResponse, NewOrder, SellerData, SellOrder, SellerTx, SellTxResponse,
-                                               handleBuildCancelTx, handleBuildSellTx, handleSellerData, handleSellOrders, handleSubmitCancelTx, handleSubmitSellTx)
-import           P2POnRamp.Api.Tx             (AddSubmitParams, SubmitTxResult, UnsignedTxResponse)
+import           P2POnRamp.Api.BuyerClaim    (ClaimCrypto, ClaimCryptoResponse,
+                                              FiatVerified, FiatVerify,
+                                              handleBuildClaimTx,
+                                              handleFiatSign,
+                                              handleSubmitClaimTx)
+import           P2POnRamp.Api.BuyerCommit   (BuyCommit, handleBuildBuyTx,
+                                              handleSubmitBuyTx)
+import           P2POnRamp.Api.Context       (Ctx (..))
+import           P2POnRamp.Api.Seller        (CancelOrder, CancelOrderResponse,
+                                              NewOrder, SellOrder,
+                                              SellTxResponse, SellerData,
+                                              SellerTx, handleBuildCancelTx,
+                                              handleBuildSellTx,
+                                              handleSellOrders,
+                                              handleSellerData,
+                                              handleSubmitCancelTx,
+                                              handleSubmitSellTx)
+import           P2POnRamp.Api.Tx            (AddSubmitParams, SubmitTxResult,
+                                              UnsignedTxResponse)
 
 
 -- | Type for our Servant API.

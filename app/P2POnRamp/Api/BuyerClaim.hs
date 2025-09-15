@@ -1,36 +1,47 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module P2POnRamp.Api.BuyerClaim where
 
-import           Control.Monad                 (void)
+import           Control.Monad                (void)
 import           Crypto.PubKey.Ed25519
 import           Data.Aeson
-import qualified Data.ByteArray                as BA
+import qualified Data.ByteArray               as BA
 import           Data.Default
-import           Data.Maybe                    (fromJust, isJust, isNothing)
-import           Data.List                     (find)
-import           Data.String                   (fromString)
-import qualified Data.Text                     as T
-import qualified Data.Text.Encoding            as TE
-import           GeniusYield.GYConfig                   (GYCoreConfig (..))
+import           Data.List                    (find)
+import           Data.Maybe                   (fromJust, isJust, isNothing)
+import           Data.String                  (fromString)
+import qualified Data.Text                    as T
+import qualified Data.Text.Encoding           as TE
+import           GeniusYield.GYConfig         (GYCoreConfig (..))
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import           GHC.Generics
-import           PlutusLedgerApi.V3            as V3
-import           PlutusTx                      (makeIsDataIndexed)
+import           PlutusLedgerApi.V3           as V3
+import           PlutusTx                     (makeIsDataIndexed)
 import           Prelude
-import           System.FilePath               ((</>))
+import           System.FilePath              ((</>))
 
-import           P2POnRamp.Api.Context         (Ctx (..), dbFile, internalErr, notFoundErr, decodeOnRampParams, readDB)
-import           P2POnRamp.Api.Tx              (AddSubmitParams (..), SubmitTxResult (..), UnsignedTxResponse, txBodySubmitTxResult, unSignedTxWithFee)
-import           P2POnRamp.OrdersDB            (DB (..), Order (..), SellerInfo (..), setCompletedIfNull, setFiatSignatureIfNull)
-import qualified P2POnRamp.OrdersDB            as DB (CompletedType (Claim))
-import           P2POnRamp.Utils               (hexToBuiltin', toHexText)
-import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
-import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..), OnRampRedeemer (..), onRampCompiled)
+import           P2POnRamp.Api.Context        (Ctx (..), dbFile,
+                                               decodeOnRampParams, internalErr,
+                                               notFoundErr, readDB)
+import           P2POnRamp.Api.Tx             (AddSubmitParams (..),
+                                               SubmitTxResult (..),
+                                               UnsignedTxResponse,
+                                               txBodySubmitTxResult,
+                                               unSignedTxWithFee)
+import           P2POnRamp.OrdersDB           (DB (..), Order (..),
+                                               SellerInfo (..),
+                                               setCompletedIfNull,
+                                               setFiatSignatureIfNull)
+import qualified P2POnRamp.OrdersDB           as DB (CompletedType (Claim))
+import           P2POnRamp.Utils              (hexToBuiltin', toHexText)
+import           ZkFold.Cardano.Crypto.Utils  (extractSecretKey)
+import           ZkFold.Cardano.OnChain.Utils (dataToBlake)
+import           ZkFold.Cardano.UPLC.OnRamp   (OnRampParams (..),
+                                               OnRampRedeemer (..),
+                                               onRampCompiled)
 
 
 -- | Order whose fiat deposit is to be verified.

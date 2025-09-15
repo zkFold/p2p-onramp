@@ -4,9 +4,10 @@
 module Main where
 
 import           Data.Maybe                 (fromJust)
-import           GeniusYield.GYConfig       (GYCoreConfig (..), coreConfigIO, withCfgProviders)
-import           GeniusYield.Types
+import           GeniusYield.GYConfig       (GYCoreConfig (..), coreConfigIO,
+                                             withCfgProviders)
 import           GeniusYield.TxBuilder
+import           GeniusYield.Types
 import           PlutusLedgerApi.V3         as V3
 import           Prelude
 import           System.Directory           (createDirectoryIfMissing)
@@ -17,8 +18,8 @@ import           ZkFold.Cardano.UPLC.OnRamp (OnRampDatum (..))
 
 
 data Ctx = Ctx
-  { ctxCoreCfg      :: !GYCoreConfig
-  , ctxProviders    :: !GYProviders
+  { ctxCoreCfg   :: !GYCoreConfig
+  , ctxProviders :: !GYProviders
   }
 
 -- | Getting path for our core configuration.

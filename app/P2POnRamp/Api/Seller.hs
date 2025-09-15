@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module P2POnRamp.Api.Seller where
 
 import           Control.Monad                 (void)
+import           Crypto.Error                  (CryptoFailable (..))
+import qualified Crypto.PubKey.Ed25519         as Ed25519
 import           Data.Aeson                    (FromJSON (..), ToJSON (..))
 import qualified Data.Aeson                    as Aeson
 import qualified Data.ByteArray                as BA
@@ -16,28 +18,35 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           GeniusYield.GYConfig          (GYCoreConfig (..))
-import           GeniusYield.Types
 import           GeniusYield.TxBuilder
+import           GeniusYield.Types
 import           GHC.Generics                  (Generic)
 import           PlutusLedgerApi.V1.Value      (lovelaceValue)
 import           PlutusLedgerApi.V3            as V3
 import           PlutusTx                      (makeIsDataIndexed)
 import           Prelude
 import           System.FilePath               ((</>))
-import           Crypto.Error                  (CryptoFailable(..))
-import qualified Crypto.PubKey.Ed25519         as Ed25519
 
-import           P2POnRamp.Api.Context         (Ctx (..),badRequest, dbFile, internalErr, notFoundErr, onRampPolicy, readDB)
-import           P2POnRamp.Api.Tx              (UnsignedTxResponse (..), AddSubmitParams (..), SubmitTxResult (..),
-                                                txBodySubmitTxResult, unSignedTxWithFee)
-import           P2POnRamp.OrdersDB            (Order (..), SellerInfo (..), IniInfo (..),
-                                                createOrder, setSellPostTxIfNull, DB (..), setCompletedIfNull)
+import           P2POnRamp.Api.Context         (Ctx (..), badRequest, dbFile,
+                                                internalErr, notFoundErr,
+                                                onRampPolicy, readDB)
+import           P2POnRamp.Api.Tx              (AddSubmitParams (..),
+                                                SubmitTxResult (..),
+                                                UnsignedTxResponse (..),
+                                                txBodySubmitTxResult,
+                                                unSignedTxWithFee)
+import           P2POnRamp.OrdersDB            (DB (..), IniInfo (..),
+                                                Order (..), SellerInfo (..),
+                                                createOrder, setCompletedIfNull,
+                                                setSellPostTxIfNull)
 import qualified P2POnRamp.OrdersDB            as DB (CompletedType (Cancel))
-import           P2POnRamp.Utils               (hexToBuiltin', posixToMillis, toHexText)
+import           P2POnRamp.Utils               (hexToBuiltin', posixToMillis,
+                                                toHexText)
 import           ZkFold.Cardano.Crypto.Utils   (eitherHexToKey)
 import           ZkFold.Cardano.OffChain.Utils (dataToJSON)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
-import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..), OnRampRedeemer (..))
+import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..),
+                                                OnRampRedeemer (..))
 
 
 --------------------------------------------------------------------------------
@@ -252,7 +261,7 @@ handleSellOrders ctx path = do
   case dbE of
     Left err -> badRequest err
     Right db -> mapM (sellOrders ctx) (filterOrdersBySell $ orders db)
-      
+
 
 --------------------------------------------------------------------------------
 -- Handler: cancel order

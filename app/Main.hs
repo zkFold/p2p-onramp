@@ -1,15 +1,15 @@
 module Main where
 
-import           Data.Aeson                    (eitherDecodeFileStrict)
-import           GeniusYield.GYConfig          (coreConfigIO, withCfgProviders)
+import           Data.Aeson               (eitherDecodeFileStrict)
+import           GeniusYield.GYConfig     (coreConfigIO, withCfgProviders)
 import           Network.Wai.Handler.Warp
 import           Prelude
-import           System.Directory              (createDirectoryIfMissing)
-import           System.Environment            (getArgs)
-import           System.FilePath               ((</>))
+import           System.Directory         (createDirectoryIfMissing)
+import           System.Environment       (getArgs)
+import           System.FilePath          ((</>))
 
-import           P2POnRamp.Api                 (app)
-import           P2POnRamp.Api.Context         (Ctx (..), dbFile)
+import           P2POnRamp.Api            (app)
+import           P2POnRamp.Api.Context    (Ctx (..), dbFile)
 import           P2POnRamp.OrdersDB
 
 
