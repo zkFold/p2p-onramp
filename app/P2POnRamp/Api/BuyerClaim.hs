@@ -8,12 +8,10 @@ import           Control.Monad                 (void)
 import           Crypto.PubKey.Ed25519
 import           Data.Aeson
 import qualified Data.ByteArray                as BA
--- import qualified Data.ByteString               as BS
 import           Data.Default
 import           Data.Maybe                    (fromJust, isJust, isNothing)
 import           Data.List                     (find)
 import           Data.String                   (fromString)
--- import qualified Data.ByteString.Base16        as B16
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           GeniusYield.GYConfig                   (GYCoreConfig (..))
@@ -21,7 +19,6 @@ import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import           GHC.Generics
 import           PlutusLedgerApi.V3            as V3
--- import           PlutusTx                      (makeIsDataIndexed)
 import           PlutusTx                      (makeIsDataIndexed)
 import           Prelude
 import           System.FilePath               ((</>))
@@ -84,9 +81,7 @@ handleFiatSign path FiatVerify{..} = do
               sig      = sign skFiat vkFiat . fromBuiltin . dataToBlake $ infoHash
               sigHex   = toHexText $ BA.convert sig
 
-          void $ setFiatSignatureIfNull path fvOrderID sigHex
-          -- BS.writeFile (path </> "fiatSignature.bin") $ BA.convert sig
-          -- return . FiatVerified . TE.decodeUtf8 . B16.encode $ BA.convert sig
+          void $ setFiatSignatureIfNull (path </> dbFile) fvOrderID sigHex
           return $ FiatVerified sigHex
 
 data ClaimCrypto = ClaimCrypto

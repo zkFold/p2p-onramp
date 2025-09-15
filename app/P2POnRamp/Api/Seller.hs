@@ -332,7 +332,8 @@ data CancelOrder = CancelOrder
 
 instance FromJSON CancelOrder
 
-data CancelOrderResponse = COFail Natural  -- Too early to cancel (milliseconds remaining)
+data CancelOrderResponse = COFiatSigned     -- Already signed by fiat verifier
+                         | COEarly Natural  -- Too early to cancel (milliseconds remaining)
                          | COSucc UnsignedTxResponse
   deriving (Show, Generic)
 
@@ -355,60 +356,61 @@ handleBuildCancelTx Ctx{..} path CancelOrder{..} = do
 
       let req :: Order -> Bool
           req o = orderID o == coOrderID && isNothing (completedData o)
-      selectedTxId <- case find req $ orders db of
+      (selectedTxId, hasFiatSigned) <- case find req $ orders db of
         Nothing -> notFoundErr "Order not found"
         Just o  -> case buyPostTx o of
-          Just txid -> pure txid
+          Just txid -> pure (txid, isJust $ fiatSignature o)
           Nothing   -> case sellPostTx o of
             Nothing   -> notFoundErr "Sell order not yet onchain"
-            Just txid -> pure txid
+            Just txid -> pure (txid, False)
 
-      let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
+      if hasFiatSigned then return COFiatSigned else do
+        let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
 
-      mutxo <- runGYTxQueryMonadIO nid
-                                   providers $
-                                   utxoAtTxOutRef selectedOref
-      selectedUtxo <- case mutxo of
-                        Nothing -> notFoundErr "Missing UTxO for selected order"
-                        Just u  -> pure u
+        mutxo <- runGYTxQueryMonadIO nid
+                                     providers $
+                                     utxoAtTxOutRef selectedOref
+        selectedUtxo <- case mutxo of
+                          Nothing -> notFoundErr "Missing UTxO for selected order"
+                          Just u  -> pure u
 
-      let mt1 = do
-            let dat = outDatumToPlutus $ utxoOutDatum selectedUtxo
-            orDat'       <- case dat of
-              OutputDatum d -> Just $ getDatum d
-              _             -> Nothing
-            orDat        <- fromBuiltinData @OnRampDatum orDat'
-            POSIXTime t1 <- timelock orDat
-            return $ t1
+        let mt1 = do
+              let dat = outDatumToPlutus $ utxoOutDatum selectedUtxo
+              orDat'       <- case dat of
+                OutputDatum d -> Just $ getDatum d
+                _             -> Nothing
+              orDat        <- fromBuiltinData @OnRampDatum orDat'
+              POSIXTime t1 <- timelock orDat
+              return $ t1
 
-      t0' <- getCurrentGYTime
-      let timePadding = 30000  -- 30 seconds
-          t0          = (posixToMillis $ timeToPOSIX t0') - timePadding
-      case mt1 of
-        Just t1 | t0 <= t1 -> return . COFail . fromInteger $ t1 - t0
+        t0' <- getCurrentGYTime
+        let timePadding = 30000  -- 30 seconds
+            t0          = (posixToMillis $ timeToPOSIX t0') - timePadding
+        case mt1 of
+          Just t1 | t0 <= t1 -> return . COEarly . fromInteger $ t1 - t0
 
-        _ -> do
-          sellerPKH <- addressToPubKeyHashIO sellerAddress
+          _ -> do
+            sellerPKH <- addressToPubKeyHashIO sellerAddress
 
-          let redeemer = redeemerFromPlutusData . toBuiltinData $ Cancel
+            let redeemer = redeemerFromPlutusData . toBuiltinData $ Cancel
 
-          let onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
-              onRampWit          = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
+            let onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
+                onRampWit          = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
 
-          let skeleton' = mustHaveInput (GYTxIn selectedOref onRampWit)
-                       <> mustHaveOutput (GYTxOut sellerAddress (utxoValue selectedUtxo) Nothing Nothing)
-                       <> mustBeSignedBy sellerPKH
+            let skeleton' = mustHaveInput (GYTxIn selectedOref onRampWit)
+                         <> mustHaveOutput (GYTxOut sellerAddress (utxoValue selectedUtxo) Nothing Nothing)
+                         <> mustBeSignedBy sellerPKH
 
-          txBody <- runGYTxBuilderMonadIO nid
-                                          providers
-                                          coSellerAddrs
-                                          coChangeAddr
-                                          Nothing $ do
-            cslot <- slotOfCurrentBlock
-            let skeleton = skeleton' <> isInvalidBefore cslot
-            buildTxBody skeleton
+            txBody <- runGYTxBuilderMonadIO nid
+                                            providers
+                                            coSellerAddrs
+                                            coChangeAddr
+                                            Nothing $ do
+              cslot <- slotOfCurrentBlock
+              let skeleton = skeleton' <> isInvalidBefore cslot
+              buildTxBody skeleton
 
-          return . COSucc $ unSignedTxWithFee txBody
+            return . COSucc $ unSignedTxWithFee txBody
 
 handleSubmitCancelTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult
 handleSubmitCancelTx Ctx{..} path AddSubmitParams{..} = do

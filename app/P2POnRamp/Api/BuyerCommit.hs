@@ -1,21 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
--- {-# LANGUAGE TemplateHaskell   #-}
 
 module P2POnRamp.Api.BuyerCommit where
 
 import           Control.Monad                 (void)
--- import           Crypto.PubKey.Ed25519
 import           Data.Aeson
--- import qualified Data.ByteArray                as BA
 import qualified Data.ByteString               as BS
 import           Data.Default
 import           Data.Maybe                    (fromJust)
 import           Data.List                     (find)
 import           Data.String                            (fromString)
--- import qualified Data.ByteString.Base16        as B16
 import qualified Data.Text                     as T
--- import qualified Data.Text.Encoding            as TE
 import           GeniusYield.GYConfig                   (GYCoreConfig (..))
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
@@ -28,7 +23,6 @@ import           P2POnRamp.Api.Context         (Ctx (..), badRequest, dbFile, in
 import           P2POnRamp.Api.Tx              (AddSubmitParams (..), SubmitTxResult (..), UnsignedTxResponse, txBodySubmitTxResult, unSignedTxWithFee)
 import           P2POnRamp.OrdersDB            (DB (..), Order (..), setBuyPostTxIfNull)
 import           P2POnRamp.Utils               (hexToBuiltin)
--- import           ZkFold.Cardano.Crypto.Utils   (extractSecretKey)
 import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..), OnRampRedeemer (..))
 
@@ -101,7 +95,6 @@ handleBuyerCommit Ctx{..} path bc@BuyCommit{..} = do
                         Just u  -> pure u
 
       buyerPKH <- addressToPubKeyHashIO buyerAddress
-      -- putStrLn $ "\nBuyer's pub key hash: " ++ (show buyerPKH) ++ "\n"  -- DEBUG
 
       orDatUpdated <- updateDatum selectedUtxo buyerPKH timeInc
 
@@ -172,16 +165,6 @@ handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
         buildTxBody skeleton
 
       return $ unSignedTxWithFee txBody
-
--- -- | Submit parameters to add for witness and order Id.  Assumption: frontend
--- -- honestly sends the correct order ID.
--- data AddBuySubmitParams = AddBuySubmitParams
---   { abspTxUnsigned :: !GYTx
---   , abspTxWit      :: !GYTxWitness
---   , abspOrderID    :: !Int
---   } deriving Generic
-
--- instance FromJSON AddBuySubmitParams
 
 -- | Add key witness to the unsigned tx, submit tx and store txid.
 handleSubmitBuyTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult

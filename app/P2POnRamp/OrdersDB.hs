@@ -215,26 +215,42 @@ createOrder path seller ini = withFileLock path $ do
 -- Update helpers: update an order by ID, but only if it changed
 updateOrderIf :: FilePath
               -> Int
-              -> (Order -> (Order, Bool))  -- returns (updatedOrder, didChange)
-              -> IO Bool                   -- True if the DB changed
+              -> (Order -> (Order, Bool))
+              -> IO Bool
 updateOrderIf path oid upd = withFileLock path $ do
   db <- loadDB path
-  let (changed, newOs) = go False (orders db)
-      go :: Bool -> [Order] -> (Bool, [Order])
-      go acc [] = (acc, [])
-      go acc (o:os)
-        | orderID o == oid =
-            let (o', ch) = upd o
-            in  if ch then
-                  let (acc', rest) = go True os in (acc' || True, o' : rest)
-                else
-                  let (acc', rest) = go acc os in (acc', o : rest)
-        | otherwise =
-            let (acc', rest) = go acc os
-            in  (acc', o : rest)
-  if changed
-    then saveDB path (db { orders = newOs }) >> pure True
-    else pure False
+  let os = orders db
+  case break ((== oid) . orderID) os of
+    (pre, o:post) ->
+      let (o', ch) = upd o
+      in if ch
+           then saveDB path (db { orders = pre ++ (o' : post) }) >> pure True
+           else pure False
+    _ -> pure False  -- not found
+
+-- -- Update helpers: update an order by ID, but only if it changed
+-- updateOrderIf :: FilePath
+--               -> Int
+--               -> (Order -> (Order, Bool))  -- returns (updatedOrder, didChange)
+--               -> IO Bool                   -- True if the DB changed
+-- updateOrderIf path oid upd = withFileLock path $ do
+--   db <- loadDB path
+--   let (changed, newOs) = go False (orders db)
+--       go :: Bool -> [Order] -> (Bool, [Order])
+--       go acc [] = (acc, [])
+--       go acc (o:os)
+--         | orderID o == oid =
+--             let (o', ch) = upd o
+--             in  if ch then
+--                   let (acc', rest) = go True os in (acc' || True, o' : rest)
+--                 else
+--                   let (acc', rest) = go acc os in (acc', o : rest)
+--         | otherwise =
+--             let (acc', rest) = go acc os
+--             in  (acc', o : rest)
+--   if changed
+--     then saveDB path (db { orders = newOs }) >> pure True
+--     else pure False
 
 -- Only set sellPostTx if it is currently Nothing
 setSellPostTxIfNull :: FilePath -> Int -> Text -> IO Bool
