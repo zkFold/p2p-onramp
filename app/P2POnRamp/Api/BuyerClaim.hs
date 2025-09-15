@@ -103,7 +103,7 @@ data ClaimCrypto = ClaimCrypto
 
 instance FromJSON ClaimCrypto
 
-data ClaimCryptoResponse = CCFiatUnsigned  -- Fiat verifier has not yet signed
+data ClaimCryptoResponse = CCFiatUnsigned  -- Fiat witness has not yet signed
                          | CCSucc UnsignedTxResponse
   deriving (Show, Generic)
 

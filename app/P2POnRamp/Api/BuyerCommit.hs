@@ -49,12 +49,7 @@ instance ToJSON BuyCommit
 timeInc :: Integer
 timeInc = 600  -- 10 minutes
 
-testSig :: BuiltinByteString
-testSig = case hexToBuiltin "71530aa2cdd8ae2df23cc586301e9c57e7107025b1f85d6a8bc75d127f0c584eb15f17a6b1c4a729d92abe82e3ef19c1ea21f965557557db59d9add6b443c301" of
-  Left _  -> error $ "Unexpected: not an ex string"
-  Right b -> b
-
--- | Updated 'OnRampDatum' for given UTxO, buyer's pub-key hash and time
+-- | Update 'OnRampDatum' for given UTxO, buyer's pub-key hash and time
 -- increment in seconds.
 updateDatum :: GYUTxO -> GYPubKeyHash -> Integer -> IO OnRampDatum
 updateDatum utxo pkh tInc = do

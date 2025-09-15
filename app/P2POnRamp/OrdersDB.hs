@@ -100,7 +100,7 @@ data Order = Order
   , completedData :: Maybe CompletedData
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
--- DB file wrapper: nextOrderID + orders
+-- | DB file wrapper: nextOrderID + orders
 data DB = DB
   { nextOrderID :: Int
   , orders      :: [Order]
@@ -109,7 +109,7 @@ data DB = DB
 --------------------------------------------------------------------------------
 -- File locking (simple cooperating-process lock via O_CREAT|O_EXCL)
 
--- Acquire: create <db>.lock with O_EXCL. Release: close + unlink.
+-- | Acquire: create <db>.lock with O_EXCL. Release: close + unlink.
 withFileLock :: FilePath -> IO a -> IO a
 withFileLock dbPath action = bracket acquire release (const action)
   where
@@ -185,17 +185,17 @@ saveDB path db = writeJSONAtomic path (encode db)
 --------------------------------------------------------------------------------
 -- Public API
 
--- Ensure the DB file exists on disk (idempotent)
+-- | Ensure the DB file exists on disk (idempotent)
 initDB :: FilePath -> IO ()
 initDB path = withFileLock path $ do
   exists <- doesFileExist path
   when (not exists) $ saveDB path (DB 1 [])
 
--- Read full list
+-- | Read full list
 readOrdersDB :: FilePath -> IO [Order]
 readOrdersDB path = orders <$> loadDB path
 
--- Create a new empty order (null fields start as Nothing)
+-- | Create a new empty order (null fields start as Nothing)
 createOrder :: FilePath -> SellerInfo -> IniInfo -> IO Order
 createOrder path seller ini = withFileLock path $ do
   db  <- loadDB path
@@ -213,7 +213,7 @@ createOrder path seller ini = withFileLock path $ do
   saveDB path db'
   pure order
 
--- Update helpers: update an order by ID, but only if it changed
+-- | Update helpers: update an order by ID, but only if it changed
 updateOrderIf :: FilePath
               -> Int
               -> (Order -> (Order, Bool))
@@ -229,31 +229,7 @@ updateOrderIf path oid upd = withFileLock path $ do
            else pure False
     _ -> pure False  -- not found
 
--- -- Update helpers: update an order by ID, but only if it changed
--- updateOrderIf :: FilePath
---               -> Int
---               -> (Order -> (Order, Bool))  -- returns (updatedOrder, didChange)
---               -> IO Bool                   -- True if the DB changed
--- updateOrderIf path oid upd = withFileLock path $ do
---   db <- loadDB path
---   let (changed, newOs) = go False (orders db)
---       go :: Bool -> [Order] -> (Bool, [Order])
---       go acc [] = (acc, [])
---       go acc (o:os)
---         | orderID o == oid =
---             let (o', ch) = upd o
---             in  if ch then
---                   let (acc', rest) = go True os in (acc' || True, o' : rest)
---                 else
---                   let (acc', rest) = go acc os in (acc', o : rest)
---         | otherwise =
---             let (acc', rest) = go acc os
---             in  (acc', o : rest)
---   if changed
---     then saveDB path (db { orders = newOs }) >> pure True
---     else pure False
-
--- Only set sellPostTx if it is currently Nothing
+-- | Only set sellPostTx if it is currently Nothing
 setSellPostTxIfNull :: FilePath -> Int -> Text -> IO Bool
 setSellPostTxIfNull path oid tx =
   updateOrderIf path oid $ \o ->
@@ -261,7 +237,7 @@ setSellPostTxIfNull path oid tx =
       then (o { sellPostTx = Just tx }, True)
       else (o, False)
 
--- Only set buyPostTx if it is currently Nothing
+-- | Only set buyPostTx if it is currently Nothing
 setBuyPostTxIfNull :: FilePath -> Int -> Text -> IO Bool
 setBuyPostTxIfNull path oid tx =
   updateOrderIf path oid $ \o ->
@@ -269,7 +245,7 @@ setBuyPostTxIfNull path oid tx =
       then (o { buyPostTx = Just tx }, True)
       else (o, False)
 
--- Only set fiatSignature if it is currently Nothing
+-- | Only set fiatSignature if it is currently Nothing
 setFiatSignatureIfNull :: FilePath -> Int -> Text -> IO Bool
 setFiatSignatureIfNull path oid sigHex =
   updateOrderIf path oid $ \o ->
@@ -277,7 +253,7 @@ setFiatSignatureIfNull path oid sigHex =
       then (o { fiatSignature = Just sigHex }, True)
       else (o, False)
 
--- Only set completedData if it is currently Nothing
+-- | Only set completedData if it is currently Nothing
 setCompletedIfNull :: FilePath -> Int -> CompletedType -> Text -> IO Bool
 setCompletedIfNull path oid ctype ctx =
   updateOrderIf path oid $ \o ->
