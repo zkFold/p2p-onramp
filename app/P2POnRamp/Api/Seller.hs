@@ -48,7 +48,6 @@ import           ZkFold.Cardano.OnChain.Utils  (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampDatum (..),
                                                 OnRampRedeemer (..))
 
-
 --------------------------------------------------------------------------------
 -- Handler: seller data
 

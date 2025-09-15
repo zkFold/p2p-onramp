@@ -54,7 +54,7 @@ makeIsDataIndexed ''OnRampRedeemer [('Cancel,0),('Update,1),('Claim,2)]
 -- | Plutus script for a trustless P2P on-ramp.
 {-# INLINABLE onRamp #-}
 onRamp :: OnRampParams -> OnRampRedeemer -> ScriptContext -> Bool
-onRamp _ (Update _signed) ctx =
+onRamp _ (Update signed) ctx =
   let
     -- Get the current on-ramp output
     (addr, val, dat) = case findOwnInput ctx of
@@ -80,7 +80,7 @@ onRamp _ (Update _signed) ctx =
     && maybe False (\t -> t `after` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat')
 
     -- Check the seller's signature
-    -- && verifyEd25519Signature (sellerPubKeyBytes dat) (dataToBlake dat') signed
+    && verifyEd25519Signature (sellerPubKeyBytes dat) (dataToBlake dat') signed
 onRamp _ Cancel ctx =
   let
     -- Get the current on-ramp output
@@ -131,6 +131,39 @@ onRamp OnRampParams{..} (Claim sig) ctx  =
     && addr'' == feeAddress
     && val'' == feeValue
 
+-- | Plutus script for a trustless P2P on-ramp (modified).
+{-# INLINABLE onRamp' #-}
+onRamp' :: OnRampParams -> OnRampRedeemer -> ScriptContext -> Bool
+onRamp' _ (Update _signed) ctx =
+  let
+    -- Get the current on-ramp output
+    (addr, val, dat) = case findOwnInput ctx of
+      Just (TxInInfo _ (TxOut a v (OutputDatum (Datum d)) Nothing)) -> (a, v, unsafeFromBuiltinData @OnRampDatum d)
+      _ -> traceError "onRamp: missing input"
+
+    -- Get the next on-ramp output
+    (addr', val', dat') = case head $ txInfoOutputs $ scriptContextTxInfo ctx of
+      TxOut a v (OutputDatum (Datum d)) _ -> (a, v, unsafeFromBuiltinData @OnRampDatum d)
+      _ -> traceError "onRamp: missing output"
+  in
+    -- Check the current on-ramp output
+    isNothing (buyerPubKeyHash dat)
+
+    -- Check the next on-ramp output
+    && addr' == addr
+    && val' == val
+    && paymentInfoHash dat' == paymentInfoHash dat
+    && sellPriceUsd dat' == sellPriceUsd dat
+    && sellerPubKeyBytes dat' == sellerPubKeyBytes dat
+    && isJust (buyerPubKeyHash dat')
+    -- The timelock must be in the future
+    && maybe False (\t -> t `after` txInfoValidRange (scriptContextTxInfo ctx)) (timelock dat')
+
+    -- Check the seller's signature
+    -- && verifyEd25519Signature (sellerPubKeyBytes dat) (dataToBlake dat') signed
+onRamp' params Cancel ctx = onRamp params Cancel ctx
+onRamp' params (Claim sig) ctx = onRamp params (Claim sig) ctx
+
 {-# INLINABLE untypedOnRamp #-}
 untypedOnRamp :: OnRampParams -> BuiltinData -> BuiltinUnit
 untypedOnRamp computation ctx' =
@@ -140,8 +173,23 @@ untypedOnRamp computation ctx' =
   in
     check $ onRamp computation redeemer ctx
 
+{-# INLINABLE untypedOnRamp' #-}
+untypedOnRamp' :: OnRampParams -> BuiltinData -> BuiltinUnit
+untypedOnRamp' computation ctx' =
+  let
+    ctx      = unsafeFromBuiltinData ctx'
+    redeemer = unsafeFromBuiltinData . getRedeemer . scriptContextRedeemer $ ctx
+  in
+    check $ onRamp' computation redeemer ctx
+
 {-# INLINABLE onRampCompiled #-}
 onRampCompiled :: OnRampParams -> CompiledCode (BuiltinData -> BuiltinUnit)
 onRampCompiled computation =
   $$(compile [|| untypedOnRamp ||])
+  `unsafeApplyCode` liftCodeDef computation
+
+{-# INLINABLE onRampCompiled' #-}
+onRampCompiled' :: OnRampParams -> CompiledCode (BuiltinData -> BuiltinUnit)
+onRampCompiled' computation =
+  $$(compile [|| untypedOnRamp' ||])
   `unsafeApplyCode` liftCodeDef computation

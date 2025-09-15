@@ -21,8 +21,7 @@ import           P2POnRamp.OrdersDB            (DB)
 import           P2POnRamp.Utils               (hexToBuiltin)
 import           ZkFold.Cardano.OffChain.Utils (parseAddress)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..),
-                                                onRampCompiled)
-
+                                                onRampCompiled')
 
 ---------------------------- :Orders DB: ----------------------------
 
@@ -56,7 +55,7 @@ decodeOnRampParams orParams' = do
 onRampPolicy :: OnRampParams' -> Either String (GYScript PlutusV3)
 onRampPolicy orParams' = do
   orParams <- decodeOnRampParams orParams'
-  let mintScript = scriptFromPlutus @PlutusV3 $ onRampCompiled orParams
+  let mintScript = scriptFromPlutus @PlutusV3 $ onRampCompiled' orParams
   return mintScript
 
 ------------------------- :Context & Setup: -------------------------

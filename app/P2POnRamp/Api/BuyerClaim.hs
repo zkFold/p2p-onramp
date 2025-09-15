@@ -41,7 +41,7 @@ import           ZkFold.Cardano.Crypto.Utils  (extractSecretKey)
 import           ZkFold.Cardano.OnChain.Utils (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp   (OnRampParams (..),
                                                OnRampRedeemer (..),
-                                               onRampCompiled)
+                                               onRampCompiled')
 
 
 -- | Order whose fiat deposit is to be verified.
@@ -133,11 +133,11 @@ handleBuildClaimTx Ctx{..} path ClaimCrypto{..} = do
           let req :: Order -> Bool
               req o = orderID o == ccOrderID && isJust (buyPostTx o)
                       && isNothing (completedData o)
+
           (selectedTxId, mFiatSig) <- case find req $ orders db of
             Nothing -> notFoundErr "Buy order not found."
             Just o  -> do
               let txid = fromJust $ buyPostTx o
-
               msig <- case fiatSignature o of
                 Nothing     -> pure Nothing
                 Just sigHex -> case hexToBuiltin' sigHex of
@@ -159,7 +159,7 @@ handleBuildClaimTx Ctx{..} path ClaimCrypto{..} = do
 
             let redeemer = redeemerFromPlutusData . toBuiltinData . Claim $ fromJust mFiatSig
 
-            let onRampScript       = scriptFromPlutus @PlutusV3 $ onRampCompiled onRampParams
+            let onRampScript       = scriptFromPlutus @PlutusV3 $ onRampCompiled' onRampParams
                 onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
                 onRampWit          = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
 

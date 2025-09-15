@@ -41,7 +41,6 @@ import           System.Posix.IO      (OpenFileFlags (..),
                                        defaultFileFlags, handleToFd, openFd)
 import           System.Posix.Types   (Fd (..), FileMode)
 
-
 --------------------------------------------------------------------------------
 -- FFI: fsync(2)
 

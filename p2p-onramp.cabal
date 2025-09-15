@@ -245,18 +245,3 @@ executable p2p-server
       wai-cors                       ,
       warp                           ,
       zkfold-cardano
-
--- executable check
---   import:           options
---   default-language: Haskell2010
---   ghc-options:      -rtsopts
---   main-is:          Main.hs
---   hs-source-dirs:   app/check
---   build-depends:
---     atlas-cardano                  ,
---     base              >= 4.9 && < 5,
---     directory                      ,
---     filepath                       ,
---     p2p-onramp                     ,
---     plutus-ledger-api
-
