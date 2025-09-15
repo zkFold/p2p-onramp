@@ -92,7 +92,13 @@ data ClaimCrypto = ClaimCrypto
 
 instance FromJSON ClaimCrypto
 
-handleBuildClaimTx :: Ctx -> FilePath -> ClaimCrypto -> IO UnsignedTxResponse
+data ClaimCryptoResponse = CCFiatUnsigned  -- Fiat verifier has not yet signed
+                         | CCSucc UnsignedTxResponse
+  deriving (Show, Generic)
+
+instance ToJSON ClaimCryptoResponse
+
+handleBuildClaimTx :: Ctx -> FilePath -> ClaimCrypto -> IO ClaimCryptoResponse
 handleBuildClaimTx Ctx{..} path ClaimCrypto{..} = do
   dbE <- readDB (path </> dbFile)
   case dbE of
@@ -115,47 +121,50 @@ handleBuildClaimTx Ctx{..} path ClaimCrypto{..} = do
         Right (onRampParams, feeAddress', feeValue') -> do
           let req :: Order -> Bool
               req o = orderID o == ccOrderID && isJust (buyPostTx o)
-                      && isJust (fiatSignature o) && isNothing (completedData o)
-          (selectedTxId, fiatSig) <- case find req $ orders db of
+                      && isNothing (completedData o)
+          (selectedTxId, mFiatSig) <- case find req $ orders db of
             Nothing -> notFoundErr "Buy order not found."
             Just o  -> do
               let txid = fromJust $ buyPostTx o
 
-              sig <- case hexToBuiltin' . fromJust $ fiatSignature o of
-                       Left err -> internalErr $ "Corrupted signature: " ++ err
-                       Right s  -> pure s
-              return (txid, sig)
+              msig <- case fiatSignature o of
+                Nothing     -> pure Nothing
+                Just sigHex -> case hexToBuiltin' sigHex of
+                                 Left err -> internalErr $ "Corrupted signature: " ++ err
+                                 Right s  -> pure $ Just s
+              return (txid, msig)
 
-          let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
+          if isNothing mFiatSig then return CCFiatUnsigned else do
+            let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
 
-          mutxo <- runGYTxQueryMonadIO nid
-                                       providers $
-                                       utxoAtTxOutRef selectedOref
-          selectedUtxo <- case mutxo of
-                            Nothing -> notFoundErr "Missing UTxO for selected order"
-                            Just u  -> pure u
+            mutxo <- runGYTxQueryMonadIO nid
+                                         providers $
+                                         utxoAtTxOutRef selectedOref
+            selectedUtxo <- case mutxo of
+                              Nothing -> notFoundErr "Missing UTxO for selected order"
+                              Just u  -> pure u
 
-          buyerPKH <- addressToPubKeyHashIO buyerAddress
+            buyerPKH <- addressToPubKeyHashIO buyerAddress
 
-          let redeemer = redeemerFromPlutusData . toBuiltinData $ Claim fiatSig
+            let redeemer = redeemerFromPlutusData . toBuiltinData . Claim $ fromJust mFiatSig
 
-          let onRampScript       = scriptFromPlutus @PlutusV3 $ onRampCompiled onRampParams
-              onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
-              onRampWit          = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
+            let onRampScript       = scriptFromPlutus @PlutusV3 $ onRampCompiled onRampParams
+                onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
+                onRampWit          = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
 
-          let skeleton = mustHaveInput (GYTxIn selectedOref onRampWit)
-                      <> mustHaveOutput (GYTxOut buyerAddress (utxoValue selectedUtxo) Nothing Nothing)
-                      <> mustHaveOutput (GYTxOut feeAddress' feeValue' Nothing Nothing)
-                      <> mustBeSignedBy buyerPKH
+            let skeleton = mustHaveInput (GYTxIn selectedOref onRampWit)
+                        <> mustHaveOutput (GYTxOut buyerAddress (utxoValue selectedUtxo) Nothing Nothing)
+                        <> mustHaveOutput (GYTxOut feeAddress' feeValue' Nothing Nothing)
+                        <> mustBeSignedBy buyerPKH
 
-          txBody <- runGYTxBuilderMonadIO nid
-                                          providers
-                                          ccBuyerAddrs
-                                          ccChangeAddr
-                                          Nothing $
-                                          buildTxBody skeleton
+            txBody <- runGYTxBuilderMonadIO nid
+                                            providers
+                                            ccBuyerAddrs
+                                            ccChangeAddr
+                                            Nothing $
+                                            buildTxBody skeleton
 
-          return $ unSignedTxWithFee txBody
+            return . CCSucc $ unSignedTxWithFee txBody
 
 handleSubmitClaimTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult
 handleSubmitClaimTx Ctx{..} path AddSubmitParams{..} = do
