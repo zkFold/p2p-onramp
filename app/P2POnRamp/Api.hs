@@ -12,7 +12,7 @@ import           Servant
 import           P2POnRamp.Api.Context        (Ctx (..))
 import           P2POnRamp.Api.BuyerCommit    (BuyCommit, handleBuildBuyTx, handleSubmitBuyTx)
 import           P2POnRamp.Api.BuyerClaim     (FiatVerify, FiatVerified, ClaimCrypto, handleFiatSign, handleBuildClaimTx, handleSubmitClaimTx)
-import           P2POnRamp.Api.Seller         (CancelOrder, CancelOrderResponse, NewOrder, SellerData, SellOrder, SellerTx,
+import           P2POnRamp.Api.Seller         (CancelOrder, CancelOrderResponse, NewOrder, SellerData, SellOrder, SellerTx, SellTxResponse,
                                                handleBuildCancelTx, handleBuildSellTx, handleSellerData, handleSellOrders, handleSubmitCancelTx, handleSubmitSellTx)
 import           P2POnRamp.Api.Tx             (AddSubmitParams, SubmitTxResult, UnsignedTxResponse)
 
@@ -21,7 +21,7 @@ import           P2POnRamp.Api.Tx             (AddSubmitParams, SubmitTxResult, 
 type API = "seller-data" :> ReqBody '[JSON] SellerData
                          :> Post '[JSON] NewOrder
       :<|> "sell-build" :> ReqBody '[JSON] SellerTx
-                        :> Post '[JSON] UnsignedTxResponse
+                        :> Post '[JSON] SellTxResponse
       :<|> "sell-submit" :> ReqBody '[JSON] AddSubmitParams
                          :> Post '[JSON] SubmitTxResult
       :<|> "cancel-build" :> ReqBody '[JSON] CancelOrder

@@ -4,16 +4,16 @@ module P2POnRamp.Api.Context where
 
 import           Control.Exception             (throwIO)
 import           Data.Aeson
-import qualified Data.Text            as T
--- import qualified Data.ByteString      as BS
-import qualified Data.ByteString.Lazy      as BL
+import qualified Data.ByteString.Lazy          as BL
 import qualified Data.ByteString.Char8         as BSC
 import qualified Data.ByteString.Lazy          as LBS
-import           GeniusYield.GYConfig (GYCoreConfig (..))
+import qualified Data.Text                     as T
+import qualified Data.Text.Encoding            as TE
+import           GeniusYield.GYConfig          (GYCoreConfig (..))
 import           GeniusYield.Types
 import           GHC.Generics
 import           PlutusLedgerApi.V3
-import           PlutusLedgerApi.V1.Value (lovelaceValue)
+import           PlutusLedgerApi.V1.Value      (lovelaceValue)
 import           Prelude
 import           Servant
 
@@ -54,10 +54,6 @@ decodeOnRampParams orParams' = do
 -- | Minting policy from OnRamp parameters decoded from JSON
 onRampPolicy :: OnRampParams' -> Either String (GYScript PlutusV3)
 onRampPolicy orParams' = do
-  -- feeAddr <- parseAddress $ orpFeeAddress orParams'
-  -- feePKBytes <- hexToBuiltin $ orpFiatPubKeyBytes orParams'
-  -- let feeVal = lovelaceValue . Lovelace $ orpFeeValue orParams'
-  --     orParams = OnRampParams feeAddr feeVal feePKBytes
   orParams <- decodeOnRampParams orParams'
   let mintScript = scriptFromPlutus @PlutusV3 $ onRampCompiled orParams
   return mintScript
@@ -97,3 +93,6 @@ notFoundErr msg = throwIO $ err404 { errBody = LBS.fromStrict (BSC.pack msg) }
 
 internalErr :: String -> IO a
 internalErr msg = throwIO $ err500 { errBody = LBS.fromStrict (BSC.pack msg) }
+
+unauthorizedText :: T.Text -> IO T.Text
+unauthorizedText t = throwIO $ err401 { errBody = LBS.fromStrict (TE.encodeUtf8 t) }

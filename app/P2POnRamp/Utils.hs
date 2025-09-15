@@ -18,13 +18,23 @@ import           Prelude
 hexToBuiltin :: String -> Either String BuiltinByteString
 hexToBuiltin s = toBuiltin <$> B16.decode (C8.pack s)
 
+decodeHexStrict :: T.Text -> Either String BS.ByteString
+decodeHexStrict = B16.decode . TE.encodeUtf8
+
 -- | Decode hex-encoded Text into BuiltinByteString
 hexToBuiltin' :: T.Text -> Either String BuiltinByteString
-hexToBuiltin' t = toBuiltin <$> B16.decode (TE.encodeUtf8 t)
+hexToBuiltin' t = toBuiltin <$> decodeHexStrict t
 
 -- | Convert ByteString as hex-encoded Text
 toHexText :: BS.ByteString -> T.Text
 toHexText = TE.decodeUtf8 . B16.encode
+
+decodeHexSized :: Int -> T.Text -> String -> Either String BS.ByteString
+decodeHexSized n t what = do
+  bs <- decodeHexStrict t
+  if BS.length bs == n
+    then Right bs
+    else Left $ what <> " must be exactly " <> show n <> " bytes (got " <> show (BS.length bs) <> ")"
 
 -- | Convert POSIX time to miliseconds (integer).
 posixToMillis :: Clock.POSIXTime -> Integer
