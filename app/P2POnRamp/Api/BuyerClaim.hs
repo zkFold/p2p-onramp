@@ -67,11 +67,8 @@ fromSellerInfo (SellerInfo nm acc) = SellerInfoBBS nm' acc'
   where nm'  = toBuiltin $ TE.encodeUtf8 nm
         acc' = toBuiltin $ TE.encodeUtf8 acc
 
-fiatSkeyPath :: FilePath  -- ToDo: to be given as parameter
-fiatSkeyPath = "keys" </> "alice.skey"
-
-handleFiatSign :: FilePath -> FiatVerify -> IO FiatVerified
-handleFiatSign path FiatVerify{..} = do
+handleFiatSign :: Ctx -> FilePath -> FiatVerify -> IO FiatVerified
+handleFiatSign Ctx{..} path FiatVerify{..} = do
   orders <- readOrdersDB (path </> dbFile)
 
   let req :: Order -> Bool
@@ -80,7 +77,7 @@ handleFiatSign path FiatVerify{..} = do
                   Nothing -> notFoundErr "Sell order not found"
                   Just o  -> pure $ sellerInfo o
 
-  skFiatE <- extractSecretKey (path </> fiatSkeyPath)
+  skFiatE <- extractSecretKey ctxFiatSKeyFilePath
   case skFiatE of
     Left err     -> internalErr err
     Right skFiat -> do

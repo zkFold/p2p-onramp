@@ -1,0 +1,9 @@
+{
+  "orParams": {
+    "orpFeeAddress": "copy contents of file fiat.addr"
+    "orpFeeValue": "number representing Lovelaces",
+    "orpFiatPubKeyBytes": "copy contents of field cborHex of file fiat.vkey"
+  },
+  "orFiatSKeyFilePath": "path to file fiat.skey",
+  "orClaimGracePeriod": "number representing seconds"
+}

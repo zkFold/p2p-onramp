@@ -6,6 +6,7 @@ import           GeniusYield.Types
 import           GHC.Generics
 import           Prelude
 
+
 ------------------------- :Unsigned response: -------------------------
 
 data UnsignedTxResponse = UnsignedTxResponse
@@ -21,6 +22,7 @@ unSignedTxWithFee txBody = UnsignedTxResponse
   { urspTxBodyHex  = T.pack . txToHex $ unsignedTx txBody
   , urspTxFee      = Just $ txBodyFee txBody
   }
+
 
 ---------------------------- :Submit Tx: ----------------------------
 

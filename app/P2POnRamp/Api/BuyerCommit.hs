@@ -5,7 +5,6 @@ module P2POnRamp.Api.BuyerCommit where
 
 import           Control.Monad                (void)
 import           Data.Aeson
-import qualified Data.ByteString              as BS
 import           Data.Default
 import           Data.List                    (find)
 import           Data.Maybe                   (fromJust)
@@ -29,16 +28,9 @@ import           P2POnRamp.Api.Tx             (AddSubmitParams (..),
                                                unSignedTxWithFee)
 import           P2POnRamp.OrdersDB           (Order (..), readOrdersDB, setBuyPostTxIfNull)
 import           P2POnRamp.Utils              (hexToBuiltin)
-import           ZkFold.Cardano.OnChain.Utils (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp   (OnRampDatum (..),
                                                OnRampRedeemer (..))
 
---------------------------------------------------------------------------------
--- Defaults
-
--- | Default time increment (grace period for buyer to claim)
-defaultTimeInc :: Integer
-defaultTimeInc = 600  -- 10 minutes
 
 -- | Buyer's public key and selected sell-order.
 data BuyCommit = BuyCommit
@@ -49,15 +41,6 @@ data BuyCommit = BuyCommit
 
 instance FromJSON BuyCommit
 instance ToJSON BuyCommit
-
--- | ToDo: decide on a mechanism to set time increment.
-timeInc :: Integer
-timeInc = 600  -- 10 minutes
-
-testSig :: BuiltinByteString
-testSig = case hexToBuiltin "71530aa2cdd8ae2df23cc586301e9c57e7107025b1f85d6a8bc75d127f0c584eb15f17a6b1c4a729d92abe82e3ef19c1ea21f965557557db59d9add6b443c301" of
-  Left _  -> error $ "Unexpected: not an ex string"
-  Right b -> b
 
 -- | Update 'OnRampDatum' for given UTxO, buyer's pub-key hash and time
 -- increment in seconds.
@@ -82,37 +65,10 @@ updateDatum utxo pkh tInc = do
                   }
       return d'
 
-handleBuyerCommit :: Ctx -> FilePath -> BuyCommit -> IO BuyCommit
-handleBuyerCommit Ctx{..} path bc@BuyCommit{..} = do
-  let nid           = cfgNetworkId ctxCoreCfg
-      providers     = ctxProviders
-      buyerAddress  = head bcBuyerAddrs
-
-  orders <- readOrdersDB (path </> dbFile)
-
-  selectedTxId <- case find (\o -> orderID o == bcOrderID) orders of
-                    Nothing -> notFoundErr "Sell order not found"
-                    Just o  -> case sellPostTx o of
-                                 Nothing   -> notFoundErr "Sell order not yet onchain"
-                                 Just txid -> pure txid
-
-  let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
-
-  mutxo <- runGYTxQueryMonadIO nid
-                               providers $
-                               utxoAtTxOutRef selectedOref
-  selectedUtxo <- case mutxo of
-                    Nothing -> notFoundErr "Missing UTxO for selected order"
-                    Just u  -> pure u
-
-  buyerPKH <- addressToPubKeyHashIO buyerAddress
-
-  orDatUpdated <- updateDatum selectedUtxo buyerPKH timeInc
-
-  let orDatUpdatedHash = fromBuiltin $ dataToBlake orDatUpdated
-  BS.writeFile (path </> "buyerCommit.bs") orDatUpdatedHash
-
-  return bc
+testSig :: BuiltinByteString
+testSig = case hexToBuiltin "71530aa2cdd8ae2df23cc586301e9c57e7107025b1f85d6a8bc75d127f0c584eb15f17a6b1c4a729d92abe82e3ef19c1ea21f965557557db59d9add6b443c301" of
+  Left _  -> error $ "Unexpected: not an ex string"
+  Right b -> b
 
 handleBuildBuyTx :: Ctx -> FilePath -> BuyCommit -> IO UnsignedTxResponse
 handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
@@ -146,7 +102,7 @@ handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
 
   buyerPKH <- addressToPubKeyHashIO buyerAddress
 
-  onRampDatumUpdated <- updateDatum selectedUtxo buyerPKH timeInc
+  onRampDatumUpdated <- updateDatum selectedUtxo buyerPKH ctxClaimGracePeriod
 
   let inlineDatumNew = Just ( datumFromPlutusData $ toBuiltinData onRampDatumUpdated
                             , GYTxOutUseInlineDatum @PlutusV3

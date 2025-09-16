@@ -63,7 +63,7 @@ server ctx path = handleSellerData path
              :<|> handleSellOrders ctx path
              :<|> handleBuildBuyTx ctx path
              :<|> handleSubmitBuyTx ctx path
-             :<|> handleFiatSign path
+             :<|> handleFiatSign ctx path
              :<|> handleBuildClaimTx ctx path
              :<|> handleSubmitClaimTx ctx path
 

@@ -41,6 +41,14 @@ data OnRampParams' = OnRampParams'
 
 instance FromJSON OnRampParams'
 
+data OnRampConfig = OnRampConfig
+  { orParams           :: OnRampParams'
+  , orFiatSKeyFilePath :: FilePath
+  , orClaimGracePeriod :: Integer
+  } deriving (Show, Generic)
+
+instance FromJSON OnRampConfig
+
 -- | Decode OnRamp parameters from JSON
 decodeOnRampParams :: OnRampParams' -> Either String OnRampParams
 decodeOnRampParams orParams' = do
@@ -62,14 +70,18 @@ onRampPolicy orParams' = do
   let mintScript = scriptFromPlutus @PlutusV3 $ onRampCompiled' orParams
   return mintScript
 
+
 ------------------------- :Context & Setup: -------------------------
 
 -- | Configuration context.
 data Ctx = Ctx
-  { ctxCoreCfg      :: !GYCoreConfig
-  , ctxProviders    :: !GYProviders
-  , ctxOnRampParams :: !OnRampParams'
+  { ctxCoreCfg          :: !GYCoreConfig
+  , ctxProviders        :: !GYProviders
+  , ctxOnRampParams     :: !OnRampParams'
+  , ctxFiatSKeyFilePath :: !FilePath
+  , ctxClaimGracePeriod :: !Integer
   }
+
 
 ------------------------- :own address: -------------------------
 
@@ -86,6 +98,7 @@ data OwnPubKeyBytes = OwnPubKeyBytes { oaPubKeyBytes :: !T.Text }
 -- | Handle to get own address.
 handleOwnAddr :: OwnAddresses -> IO OwnPubKeyBytes
 handleOwnAddr OwnAddresses{..} = pure . OwnPubKeyBytes . addressToText $ head oaUsedAddrs
+
 
 ------------------------- :http helpers: -------------------------
 

@@ -9,17 +9,17 @@ import           System.Environment       (getArgs)
 import           System.FilePath          ((</>))
 
 import           P2POnRamp.Api            (app)
-import           P2POnRamp.Api.Context    (Ctx (..), dbFile)
+import           P2POnRamp.Api.Context    (Ctx (..), OnRampConfig (..), dbFile)
 import           P2POnRamp.OrdersDB
 
 
 -- | Getting path for our core configuration.
-parseArgs :: IO FilePath
+parseArgs :: IO (FilePath, FilePath)
 parseArgs = do
   args <- getArgs
   case args of
-    coreCfg: _       -> return coreCfg
-    _invalidArgument -> fail "Error: wrong arguments, needed a path to the CoreConfig JSON configuration file\n"
+    coreCfg : onrampCfg : _ -> return (coreCfg, onrampCfg)
+    _invalidArgument        -> fail "Error: wrong arguments, needed 1) path to the CoreConfig JSON configuration file and 2) path to the OnRamp JSON configuration file.\n"
 
 main :: IO ()
 main = do
@@ -30,19 +30,26 @@ main = do
   let dbPath = assetsPath </> dbFile
   initDB dbPath
 
-  putStrLn "parsing Config ..."
-  coreCfgPath <- parseArgs
-  coreCfg     <- coreConfigIO coreCfgPath
+  (coreCfgPath, onrampCfgPath) <- parseArgs
 
-  putStrLn "parsing OnRamp parameters..."
-  orParamsE <- eitherDecodeFileStrict (path </> "onramp-params.json")
-  let orParams' = case orParamsE of
-        Left  err    -> error $ "Error decoding JSON: " ++ err
-        Right params -> params
+  putStrLn "parsing CoreConfig ..."
+  coreCfg <- coreConfigIO coreCfgPath
 
-  putStrLn "Loading Providers ..."
+  putStrLn "parsing OnRamp config..."
+  orConfigE <- eitherDecodeFileStrict onrampCfgPath
+  let orConfig = case orConfigE of
+        Left  err -> error $ "Error decoding JSON: " ++ err
+        Right cfg -> cfg
+
+  putStrLn "Loading Proviers ..."
   withCfgProviders coreCfg "api-server" $ \providers -> do
     let port = 8080
-        ctx  = Ctx coreCfg providers orParams'
+        ctx  = Ctx { ctxCoreCfg          = coreCfg
+                   , ctxProviders        = providers
+                   , ctxOnRampParams     = orParams orConfig
+                   , ctxFiatSKeyFilePath = orFiatSKeyFilePath orConfig
+                   , ctxClaimGracePeriod = orClaimGracePeriod orConfig
+                   }
+
     putStrLn $ "Serving on http://localhost:" ++ show port
     run port $ app ctx assetsPath
