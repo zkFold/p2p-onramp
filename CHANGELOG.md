@@ -1,5 +1,9 @@
 # Revision history for p2p-onramp
 
-## 0.1.0.0 -- YYYY-mm-dd
+## 0.1.0.0
 
-* First version. Released on an unsuspecting world.
+* End-to-end testing
+
+## 0.1.1.0
+
+* Prototype web-app
