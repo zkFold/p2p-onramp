@@ -194,11 +194,20 @@ test-suite p2p-onramp-test
     main-is: Main.hs
     other-modules:
     build-depends:
-      base                          >= 4.9 && < 5,
-      hspec                                < 2.12,
-      QuickCheck                                 ,
-      p2p-onramp                                 ,
-      symbolic-base                              ,
+      base              >= 4.9 && < 5,
+      base16-bytestring              ,
+      bytestring                     ,
+      cryptonite                     ,
+      hspec                    < 2.12,
+      memory                         ,
+      QuickCheck                     ,
+      p2p-onramp                     ,
+      plutus-ledger-api              ,
+      plutus-tx                      ,
+      symbolic-base                  ,
+      tasty                          ,
+      tasty-quickcheck               ,
+      zkfold-cardano
     hs-source-dirs: tests
 
 executable p2p-server
