@@ -3,9 +3,12 @@
 module P2POnRamp.Api.Context where
 
 import           Control.Exception             (throwIO)
+import           Crypto.Error                  (CryptoFailable (..))
+import qualified Crypto.PubKey.Ed25519         as Ed25519
 import           Data.Aeson
+import qualified Data.ByteArray                as BA
+import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Char8         as BSC
-import qualified Data.ByteString.Lazy          as BL
 import qualified Data.ByteString.Lazy          as LBS
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
@@ -17,8 +20,7 @@ import           PlutusLedgerApi.V3
 import           Prelude
 import           Servant
 
-import           P2POnRamp.OrdersDB            (DB)
-import           P2POnRamp.Utils               (hexToBuiltin)
+import           ZkFold.Cardano.Crypto.Utils   (eitherHexToKey)
 import           ZkFold.Cardano.OffChain.Utils (parseAddress)
 import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..),
                                                 onRampCompiled')
@@ -28,10 +30,6 @@ import           ZkFold.Cardano.UPLC.OnRamp    (OnRampParams (..),
 dbFile :: FilePath
 dbFile = "orders.json"
 
-readDB :: FilePath -> IO (Either String DB)
-readDB path = do
-  bytes <- BL.readFile path
-  pure (eitherDecode bytes)
 
 -------------------------- :OnRamp Params: --------------------------
 
@@ -46,9 +44,15 @@ instance FromJSON OnRampParams'
 -- | Decode OnRamp parameters from JSON
 decodeOnRampParams :: OnRampParams' -> Either String OnRampParams
 decodeOnRampParams orParams' = do
-  feeAddr    <- parseAddress $ orpFeeAddress orParams'
-  feePKBytes <- hexToBuiltin $ orpFiatPubKeyBytes orParams'
-  let feeVal = lovelaceValue . Lovelace $ orpFeeValue orParams'
+  feeAddr     <- parseAddress $ orpFeeAddress orParams'
+  feePKBytes' <- eitherHexToKey $ orpFiatPubKeyBytes orParams'
+  feeVKey     <- case Ed25519.publicKey feePKBytes' of
+                   CryptoPassed vk -> Right vk
+                   CryptoFailed _  -> Left "Malformed public key"
+
+  let feePKBytes = toBuiltin @BS.ByteString $ BA.convert feeVKey
+      feeVal     = lovelaceValue . Lovelace $ orpFeeValue orParams'
+
   return $ OnRampParams feeAddr feeVal feePKBytes
 
 -- | Minting policy from OnRamp parameters decoded from JSON

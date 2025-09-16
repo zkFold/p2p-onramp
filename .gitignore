@@ -28,3 +28,4 @@ e2e-test/local-testnet/example/
 e2e-test/*/keys
 e2e-test/*/priv
 maestro-config.json
+onramp-config.json

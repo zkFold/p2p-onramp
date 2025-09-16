@@ -41,6 +41,8 @@ import           System.Posix.IO      (OpenFileFlags (..),
                                        defaultFileFlags, handleToFd, openFd)
 import           System.Posix.Types   (Fd (..), FileMode)
 
+import           P2POnRamp.Api.Context (internalErr)
+
 --------------------------------------------------------------------------------
 -- FFI: fsync(2)
 
@@ -176,7 +178,7 @@ loadDB path = do
     else do
       bs <- BL.readFile path
       case eitherDecode' bs of
-        Left err -> fail $ "DB decode error: " <> err
+        Left err -> internalErr $ "DB decode error: " ++ err
         Right db -> pure db
 
 saveDB :: FilePath -> DB -> IO ()

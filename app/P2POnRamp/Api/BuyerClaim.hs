@@ -25,15 +25,14 @@ import           System.FilePath              ((</>))
 
 import           P2POnRamp.Api.Context        (Ctx (..), dbFile,
                                                decodeOnRampParams, internalErr,
-                                               notFoundErr, readDB)
+                                               notFoundErr)
 import           P2POnRamp.Api.Tx             (AddSubmitParams (..),
                                                SubmitTxResult (..),
                                                UnsignedTxResponse,
                                                txBodySubmitTxResult,
                                                unSignedTxWithFee)
-import           P2POnRamp.OrdersDB           (DB (..), Order (..),
-                                               SellerInfo (..),
-                                               setCompletedIfNull,
+import           P2POnRamp.OrdersDB           (Order (..), SellerInfo (..),
+                                               readOrdersDB, setCompletedIfNull,
                                                setFiatSignatureIfNull)
 import qualified P2POnRamp.OrdersDB           as DB (CompletedType (Claim))
 import           P2POnRamp.Utils              (hexToBuiltin', toHexText)
@@ -73,27 +72,25 @@ fiatSkeyPath = "keys" </> "alice.skey"
 
 handleFiatSign :: FilePath -> FiatVerify -> IO FiatVerified
 handleFiatSign path FiatVerify{..} = do
-  dbE <- readDB (path </> dbFile)
-  case dbE of
-    Left err -> internalErr err
-    Right db -> do
-      let req :: Order -> Bool
-          req o = orderID o == fvOrderID && isJust (buyPostTx o) && isNothing (completedData o)
-      sellerInfo <- case find req $ orders db of
-                      Nothing -> notFoundErr "Sell order not found"
-                      Just o  -> pure $ sellerInfo o
+  orders <- readOrdersDB (path </> dbFile)
 
-      skFiatE <- extractSecretKey (path </> fiatSkeyPath)
-      case skFiatE of
-        Left err     -> internalErr err
-        Right skFiat -> do
-          let vkFiat   = toPublic skFiat
-              infoHash = dataToBlake $ fromSellerInfo sellerInfo
-              sig      = sign skFiat vkFiat . fromBuiltin . dataToBlake $ infoHash
-              sigHex   = toHexText $ BA.convert sig
+  let req :: Order -> Bool
+      req o = orderID o == fvOrderID && isJust (buyPostTx o) && isNothing (completedData o)
+  sellerInfo <- case find req orders of
+                  Nothing -> notFoundErr "Sell order not found"
+                  Just o  -> pure $ sellerInfo o
 
-          void $ setFiatSignatureIfNull (path </> dbFile) fvOrderID sigHex
-          return $ FiatVerified sigHex
+  skFiatE <- extractSecretKey (path </> fiatSkeyPath)
+  case skFiatE of
+    Left err     -> internalErr err
+    Right skFiat -> do
+      let vkFiat   = toPublic skFiat
+          infoHash = dataToBlake $ fromSellerInfo sellerInfo
+          sig      = sign skFiat vkFiat . fromBuiltin . dataToBlake $ infoHash
+          sigHex   = toHexText $ BA.convert sig
+
+      void $ setFiatSignatureIfNull (path </> dbFile) fvOrderID sigHex
+      return $ FiatVerified sigHex
 
 data ClaimCrypto = ClaimCrypto
   { ccBuyerAddrs :: ![GYAddress]
@@ -111,71 +108,69 @@ instance ToJSON ClaimCryptoResponse
 
 handleBuildClaimTx :: Ctx -> FilePath -> ClaimCrypto -> IO ClaimCryptoResponse
 handleBuildClaimTx Ctx{..} path ClaimCrypto{..} = do
-  dbE <- readDB (path </> dbFile)
-  case dbE of
+  let nid           = cfgNetworkId ctxCoreCfg
+      providers     = ctxProviders
+      buyerAddress  = head ccBuyerAddrs
+
+  let ctxParamsE = do
+        onRampParams <- decodeOnRampParams ctxOnRampParams
+        feeAddress'  <- either (Left . show) Right . addressFromPlutus nid $
+                        feeAddress onRampParams
+        feeValue'    <- either (Left . show) Right . valueFromPlutus $
+                        feeValue onRampParams
+        return (onRampParams, feeAddress', feeValue')
+
+  orders <- readOrdersDB (path </> dbFile)
+
+  case ctxParamsE of
     Left err -> internalErr err
-    Right db -> do
-      let nid           = cfgNetworkId ctxCoreCfg
-          providers     = ctxProviders
-          buyerAddress  = head ccBuyerAddrs
+    Right (onRampParams, feeAddress', feeValue') -> do
+      let req :: Order -> Bool
+          req o = orderID o == ccOrderID && isJust (buyPostTx o)
+                  && isNothing (completedData o)
 
-      let ctxParamsE = do
-            onRampParams <- decodeOnRampParams ctxOnRampParams
-            feeAddress'  <- either (Left . show) Right . addressFromPlutus nid $
-                            feeAddress onRampParams
-            feeValue'    <- either (Left . show) Right . valueFromPlutus $
-                            feeValue onRampParams
-            return (onRampParams, feeAddress', feeValue')
+      (selectedTxId, mFiatSig) <- case find req orders of
+        Nothing -> notFoundErr "Buy order not found."
+        Just o  -> do
+          let txid = fromJust $ buyPostTx o
+          msig <- case fiatSignature o of
+            Nothing     -> pure Nothing
+            Just sigHex -> case hexToBuiltin' sigHex of
+                             Left err -> internalErr $ "Corrupted signature: " ++ err
+                             Right s  -> pure $ Just s
+          return (txid, msig)
 
-      case ctxParamsE of
-        Left err -> internalErr err
-        Right (onRampParams, feeAddress', feeValue') -> do
-          let req :: Order -> Bool
-              req o = orderID o == ccOrderID && isJust (buyPostTx o)
-                      && isNothing (completedData o)
+      if isNothing mFiatSig then return CCFiatUnsigned else do
+        let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
 
-          (selectedTxId, mFiatSig) <- case find req $ orders db of
-            Nothing -> notFoundErr "Buy order not found."
-            Just o  -> do
-              let txid = fromJust $ buyPostTx o
-              msig <- case fiatSignature o of
-                Nothing     -> pure Nothing
-                Just sigHex -> case hexToBuiltin' sigHex of
-                                 Left err -> internalErr $ "Corrupted signature: " ++ err
-                                 Right s  -> pure $ Just s
-              return (txid, msig)
+        mutxo <- runGYTxQueryMonadIO nid
+                                     providers $
+                                     utxoAtTxOutRef selectedOref
+        selectedUtxo <- case mutxo of
+                          Nothing -> notFoundErr "Missing UTxO for selected order"
+                          Just u  -> pure u
 
-          if isNothing mFiatSig then return CCFiatUnsigned else do
-            let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
+        buyerPKH <- addressToPubKeyHashIO buyerAddress
 
-            mutxo <- runGYTxQueryMonadIO nid
-                                         providers $
-                                         utxoAtTxOutRef selectedOref
-            selectedUtxo <- case mutxo of
-                              Nothing -> notFoundErr "Missing UTxO for selected order"
-                              Just u  -> pure u
+        let redeemer = redeemerFromPlutusData . toBuiltinData . Claim $ fromJust mFiatSig
 
-            buyerPKH <- addressToPubKeyHashIO buyerAddress
+        let onRampScript       = scriptFromPlutus @PlutusV3 $ onRampCompiled' onRampParams
+            onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
+            onRampWit          = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
 
-            let redeemer = redeemerFromPlutusData . toBuiltinData . Claim $ fromJust mFiatSig
+        let skeleton = mustHaveInput (GYTxIn selectedOref onRampWit)
+                    <> mustHaveOutput (GYTxOut buyerAddress (utxoValue selectedUtxo) Nothing Nothing)
+                    <> mustHaveOutput (GYTxOut feeAddress' feeValue' Nothing Nothing)
+                    <> mustBeSignedBy buyerPKH
 
-            let onRampScript       = scriptFromPlutus @PlutusV3 $ onRampCompiled' onRampParams
-                onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
-                onRampWit          = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
+        txBody <- runGYTxBuilderMonadIO nid
+                                        providers
+                                        ccBuyerAddrs
+                                        ccChangeAddr
+                                        Nothing $
+                                        buildTxBody skeleton
 
-            let skeleton = mustHaveInput (GYTxIn selectedOref onRampWit)
-                        <> mustHaveOutput (GYTxOut buyerAddress (utxoValue selectedUtxo) Nothing Nothing)
-                        <> mustHaveOutput (GYTxOut feeAddress' feeValue' Nothing Nothing)
-                        <> mustBeSignedBy buyerPKH
-
-            txBody <- runGYTxBuilderMonadIO nid
-                                            providers
-                                            ccBuyerAddrs
-                                            ccChangeAddr
-                                            Nothing $
-                                            buildTxBody skeleton
-
-            return . CCSucc $ unSignedTxWithFee txBody
+        return . CCSucc $ unSignedTxWithFee txBody
 
 handleSubmitClaimTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult
 handleSubmitClaimTx Ctx{..} path AddSubmitParams{..} = do

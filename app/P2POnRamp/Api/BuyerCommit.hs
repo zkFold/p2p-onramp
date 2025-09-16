@@ -21,19 +21,24 @@ import           System.FilePath              ((</>))
 
 import           P2POnRamp.Api.Context        (Ctx (..), badRequest, dbFile,
                                                internalErr, notFoundErr,
-                                               onRampPolicy, readDB)
+                                               onRampPolicy)
 import           P2POnRamp.Api.Tx             (AddSubmitParams (..),
                                                SubmitTxResult (..),
                                                UnsignedTxResponse,
                                                txBodySubmitTxResult,
                                                unSignedTxWithFee)
-import           P2POnRamp.OrdersDB           (DB (..), Order (..),
-                                               setBuyPostTxIfNull)
+import           P2POnRamp.OrdersDB           (Order (..), readOrdersDB, setBuyPostTxIfNull)
 import           P2POnRamp.Utils              (hexToBuiltin)
 import           ZkFold.Cardano.OnChain.Utils (dataToBlake)
 import           ZkFold.Cardano.UPLC.OnRamp   (OnRampDatum (..),
                                                OnRampRedeemer (..))
 
+--------------------------------------------------------------------------------
+-- Defaults
+
+-- | Default time increment (grace period for buyer to claim)
+defaultTimeInc :: Integer
+defaultTimeInc = 600  -- 10 minutes
 
 -- | Buyer's public key and selected sell-order.
 data BuyCommit = BuyCommit
@@ -48,6 +53,11 @@ instance ToJSON BuyCommit
 -- | ToDo: decide on a mechanism to set time increment.
 timeInc :: Integer
 timeInc = 600  -- 10 minutes
+
+testSig :: BuiltinByteString
+testSig = case hexToBuiltin "71530aa2cdd8ae2df23cc586301e9c57e7107025b1f85d6a8bc75d127f0c584eb15f17a6b1c4a729d92abe82e3ef19c1ea21f965557557db59d9add6b443c301" of
+  Left _  -> error $ "Unexpected: not an ex string"
+  Right b -> b
 
 -- | Update 'OnRampDatum' for given UTxO, buyer's pub-key hash and time
 -- increment in seconds.
@@ -74,100 +84,96 @@ updateDatum utxo pkh tInc = do
 
 handleBuyerCommit :: Ctx -> FilePath -> BuyCommit -> IO BuyCommit
 handleBuyerCommit Ctx{..} path bc@BuyCommit{..} = do
-  dbE <- readDB (path </> dbFile)
-  case dbE of
-    Left err -> badRequest err
-    Right db -> do
-      let nid           = cfgNetworkId ctxCoreCfg
-          providers     = ctxProviders
-          buyerAddress  = head bcBuyerAddrs
+  let nid           = cfgNetworkId ctxCoreCfg
+      providers     = ctxProviders
+      buyerAddress  = head bcBuyerAddrs
 
-      selectedTxId <- case find (\o -> orderID o == bcOrderID) $ orders db of
-                        Nothing -> notFoundErr "Sell order not found"
-                        Just o  -> case sellPostTx o of
-                                     Nothing   -> notFoundErr "Sell order not yet onchain"
-                                     Just txid -> pure txid
+  orders <- readOrdersDB (path </> dbFile)
 
-      let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
+  selectedTxId <- case find (\o -> orderID o == bcOrderID) orders of
+                    Nothing -> notFoundErr "Sell order not found"
+                    Just o  -> case sellPostTx o of
+                                 Nothing   -> notFoundErr "Sell order not yet onchain"
+                                 Just txid -> pure txid
 
-      mutxo <- runGYTxQueryMonadIO nid
-                                   providers $
-                                   utxoAtTxOutRef selectedOref
-      selectedUtxo <- case mutxo of
-                        Nothing -> notFoundErr "Missing UTxO for selected order"
-                        Just u  -> pure u
+  let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
 
-      buyerPKH <- addressToPubKeyHashIO buyerAddress
+  mutxo <- runGYTxQueryMonadIO nid
+                               providers $
+                               utxoAtTxOutRef selectedOref
+  selectedUtxo <- case mutxo of
+                    Nothing -> notFoundErr "Missing UTxO for selected order"
+                    Just u  -> pure u
 
-      orDatUpdated <- updateDatum selectedUtxo buyerPKH timeInc
+  buyerPKH <- addressToPubKeyHashIO buyerAddress
 
-      let orDatUpdatedHash = fromBuiltin $ dataToBlake orDatUpdated
-      BS.writeFile (path </> "buyerCommit.bs") orDatUpdatedHash
+  orDatUpdated <- updateDatum selectedUtxo buyerPKH timeInc
 
-      return bc
+  let orDatUpdatedHash = fromBuiltin $ dataToBlake orDatUpdated
+  BS.writeFile (path </> "buyerCommit.bs") orDatUpdatedHash
+
+  return bc
 
 handleBuildBuyTx :: Ctx -> FilePath -> BuyCommit -> IO UnsignedTxResponse
 handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
-  dbE <- readDB (path </> dbFile)
-  case dbE of
-    Left err -> internalErr err
-    Right db -> do
-      let nid           = cfgNetworkId ctxCoreCfg
-          providers     = ctxProviders
-          buyerAddress  = head bcBuyerAddrs
-          onRampScriptE = onRampPolicy ctxOnRampParams
+  let nid           = cfgNetworkId ctxCoreCfg
+      providers     = ctxProviders
+      buyerAddress  = head bcBuyerAddrs
+      onRampScriptE = onRampPolicy ctxOnRampParams
 
-      onRampScript <- case onRampScriptE of
-        Left err     -> internalErr err
-        Right script -> pure script
+  onRampScript <- case onRampScriptE of
+    Left err     -> internalErr err
+    Right script -> pure script
 
-      let onRampAddr = addressFromValidator nid onRampScript
+  let onRampAddr = addressFromValidator nid onRampScript
 
-      selectedTxId <- case find (\o -> orderID o == bcOrderID) $ orders db of
-                        Nothing -> notFoundErr "Sell order not found"
-                        Just o  -> case sellPostTx o of
-                                     Nothing   -> notFoundErr "Sell order not yet onchain"
-                                     Just txid -> pure txid
+  orders <- readOrdersDB (path </> dbFile)
 
-      let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
+  selectedTxId <- case find (\o -> orderID o == bcOrderID) orders of
+                    Nothing -> notFoundErr "Sell order not found"
+                    Just o  -> case sellPostTx o of
+                                 Nothing   -> notFoundErr "Sell order not yet onchain"
+                                 Just txid -> pure txid
 
-      mutxo <- runGYTxQueryMonadIO nid
-                                   providers $
-                                   utxoAtTxOutRef selectedOref
-      selectedUtxo <- case mutxo of
-                        Nothing -> notFoundErr "Missing UTxO for selected order"
-                        Just u  -> pure u
+  let selectedOref = fromString $ T.unpack selectedTxId ++ "#0"
 
-      buyerPKH <- addressToPubKeyHashIO buyerAddress
+  mutxo <- runGYTxQueryMonadIO nid
+                               providers $
+                               utxoAtTxOutRef selectedOref
+  selectedUtxo <- case mutxo of
+                    Nothing -> notFoundErr "Missing UTxO for selected order"
+                    Just u  -> pure u
 
-      onRampDatumUpdated <- updateDatum selectedUtxo buyerPKH timeInc
+  buyerPKH <- addressToPubKeyHashIO buyerAddress
 
-      let inlineDatumNew = Just ( datumFromPlutusData $ toBuiltinData onRampDatumUpdated
-                                , GYTxOutUseInlineDatum @PlutusV3
-                                )
+  onRampDatumUpdated <- updateDatum selectedUtxo buyerPKH timeInc
 
-      let redeemer = redeemerFromPlutusData . toBuiltinData $ Update testSig
+  let inlineDatumNew = Just ( datumFromPlutusData $ toBuiltinData onRampDatumUpdated
+                            , GYTxOutUseInlineDatum @PlutusV3
+                            )
 
-      let onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
-          onRampWit = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
+  let redeemer = redeemerFromPlutusData . toBuiltinData $ Update testSig
 
-      let skeleton' = mustHaveInput (GYTxIn selectedOref onRampWit)
-                   <> mustHaveOutput (GYTxOut onRampAddr (utxoValue selectedUtxo) inlineDatumNew Nothing)
-                   <> mustBeSignedBy buyerPKH
+  let onRampPlutusScript = GYBuildPlutusScriptInlined @PlutusV3 onRampScript
+      onRampWit = GYTxInWitnessScript onRampPlutusScript Nothing redeemer
 
-      txBody <- runGYTxBuilderMonadIO nid
-                                      providers
-                                      bcBuyerAddrs
-                                      bcChangeAddr
-                                      Nothing $ do
-        cslot <- slotOfCurrentBlock
+  let skeleton' = mustHaveInput (GYTxIn selectedOref onRampWit)
+               <> mustHaveOutput (GYTxOut onRampAddr (utxoValue selectedUtxo) inlineDatumNew Nothing)
+               <> mustBeSignedBy buyerPKH
 
-        let upperSlot = fromJust $ advanceSlot cslot 300  -- allow five minutes to complete Tx submission
-            skeleton  = skeleton' <> isInvalidAfter upperSlot
+  txBody <- runGYTxBuilderMonadIO nid
+                                  providers
+                                  bcBuyerAddrs
+                                  bcChangeAddr
+                                  Nothing $ do
+    cslot <- slotOfCurrentBlock
 
-        buildTxBody skeleton
+    let upperSlot = fromJust $ advanceSlot cslot 300  -- allow five minutes to complete Tx submission
+        skeleton  = skeleton' <> isInvalidAfter upperSlot
 
-      return $ unSignedTxWithFee txBody
+    buildTxBody skeleton
+
+  return $ unSignedTxWithFee txBody
 
 -- | Add key witness to the unsigned tx, submit tx and store txid.
 handleSubmitBuyTx :: Ctx -> FilePath -> AddSubmitParams -> IO SubmitTxResult
