@@ -46,6 +46,12 @@ where
 1. `provider-config.json` contains your configuration for network and provider.  File `maestro-config-TEMPLATE.json` provides a template configuration.
 2. `onramp-config.json` contains the P2P-OnRamp's configuration parameters.  File `onramp-config-TEMPLATE.json` provides a guide for the platform's configuration.
 
+*Note:*  File `onramp-config-TEMPLATE.json` makes reference to files `fiat.addr`, `fiat.vkey` and `fiat.skey`.  These can be generated with `cardano-cli` as usual:
+```shell
+cardano-cli conway address key-gen --verification-key-file fiat.vkey --signing-key-file fiat.skey
+cardano-cli conway address build --payment-verification-key-file fiat.vkey --out-file fiat.addr --testnet-magic 2
+```
+
 The p2p-onramp server on this repository was written using the [Atlas](https://atlas-app.io) framework.
 
 ### p2p-onramp client
