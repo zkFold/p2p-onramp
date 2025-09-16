@@ -18,8 +18,9 @@ import           P2POnRamp.Api.BuyerCommit   (BuyCommit, handleBuildBuyTx,
                                               handleSubmitBuyTx)
 import           P2POnRamp.Api.Context       (Ctx (..))
 import           P2POnRamp.Api.Seller        (CancelOrder, CancelOrderResponse,
-                                              NewOrder, SellTxResponse, SellerData,
-                                              SellerTx, handleBuildCancelTx,
+                                              NewOrder, SellTxResponse,
+                                              SellerData, SellerTx,
+                                              handleBuildCancelTx,
                                               handleBuildSellTx,
                                               handleSellerData,
                                               handleSubmitCancelTx,

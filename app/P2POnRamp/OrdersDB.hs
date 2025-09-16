@@ -19,27 +19,27 @@ module P2POnRamp.OrdersDB
   , setCompletedIfNull
   ) where
 
-import           Control.Concurrent   (threadDelay)
-import           Control.Exception    (IOException, bracket, bracketOnError,
-                                       try)
-import           Control.Monad        (void, when)
-import           Data.Aeson           (FromJSON, ToJSON, eitherDecode', encode,
-                                       withText)
-import qualified Data.Aeson           as A
-import qualified Data.ByteString.Lazy as BL
-import           Data.Maybe           (isNothing)
-import           Data.Text            (Text)
-import           Foreign.C.Error      (throwErrnoIfMinus1_)
-import           Foreign.C.Types      (CInt (..))
-import           GHC.Generics         (Generic)
+import           Control.Concurrent    (threadDelay)
+import           Control.Exception     (IOException, bracket, bracketOnError,
+                                        try)
+import           Control.Monad         (void, when)
+import           Data.Aeson            (FromJSON, ToJSON, eitherDecode', encode,
+                                        withText)
+import qualified Data.Aeson            as A
+import qualified Data.ByteString.Lazy  as BL
+import           Data.Maybe            (isNothing)
+import           Data.Text             (Text)
+import           Foreign.C.Error       (throwErrnoIfMinus1_)
+import           Foreign.C.Types       (CInt (..))
+import           GHC.Generics          (Generic)
 import           Prelude
-import           System.Directory     (doesFileExist, removeFile, renameFile)
-import           System.FilePath      (takeDirectory, takeFileName)
-import           System.IO            (hClose, hFlush, openBinaryTempFile)
-import           System.Posix.IO      (OpenFileFlags (..),
-                                       OpenMode (ReadOnly, ReadWrite), closeFd,
-                                       defaultFileFlags, handleToFd, openFd)
-import           System.Posix.Types   (Fd (..), FileMode)
+import           System.Directory      (doesFileExist, removeFile, renameFile)
+import           System.FilePath       (takeDirectory, takeFileName)
+import           System.IO             (hClose, hFlush, openBinaryTempFile)
+import           System.Posix.IO       (OpenFileFlags (..),
+                                        OpenMode (ReadOnly, ReadWrite), closeFd,
+                                        defaultFileFlags, handleToFd, openFd)
+import           System.Posix.Types    (Fd (..), FileMode)
 
 import           P2POnRamp.Api.Context (internalErr)
 

@@ -3,33 +3,34 @@
 
 module P2POnRamp.Api.BuyerCommit where
 
-import           Control.Monad                (void)
+import           Control.Monad              (void)
 import           Data.Aeson
 import           Data.Default
-import           Data.List                    (find)
-import           Data.Maybe                   (fromJust)
-import           Data.String                  (fromString)
-import qualified Data.Text                    as T
-import           GeniusYield.GYConfig         (GYCoreConfig (..))
+import           Data.List                  (find)
+import           Data.Maybe                 (fromJust)
+import           Data.String                (fromString)
+import qualified Data.Text                  as T
+import           GeniusYield.GYConfig       (GYCoreConfig (..))
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import           GHC.Generics
-import           PlutusLedgerApi.V3           as V3
+import           PlutusLedgerApi.V3         as V3
 import           Prelude
-import           System.FilePath              ((</>))
+import           System.FilePath            ((</>))
 
-import           P2POnRamp.Api.Context        (Ctx (..), badRequest, dbFile,
-                                               internalErr, notFoundErr,
-                                               onRampPolicy)
-import           P2POnRamp.Api.Tx             (AddSubmitParams (..),
-                                               SubmitTxResult (..),
-                                               UnsignedTxResponse,
-                                               txBodySubmitTxResult,
-                                               unSignedTxWithFee)
-import           P2POnRamp.OrdersDB           (Order (..), readOrdersDB, setBuyPostTxIfNull)
-import           P2POnRamp.Utils              (hexToBuiltin)
-import           ZkFold.Cardano.UPLC.OnRamp   (OnRampDatum (..),
-                                               OnRampRedeemer (..))
+import           P2POnRamp.Api.Context      (Ctx (..), badRequest, dbFile,
+                                             internalErr, notFoundErr,
+                                             onRampPolicy)
+import           P2POnRamp.Api.Tx           (AddSubmitParams (..),
+                                             SubmitTxResult (..),
+                                             UnsignedTxResponse,
+                                             txBodySubmitTxResult,
+                                             unSignedTxWithFee)
+import           P2POnRamp.OrdersDB         (Order (..), readOrdersDB,
+                                             setBuyPostTxIfNull)
+import           P2POnRamp.Utils            (hexToBuiltin)
+import           ZkFold.Cardano.UPLC.OnRamp (OnRampDatum (..),
+                                             OnRampRedeemer (..))
 
 
 -- | Buyer's public key and selected sell-order.

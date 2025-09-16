@@ -35,9 +35,11 @@ import           P2POnRamp.Api.Tx              (AddSubmitParams (..),
                                                 UnsignedTxResponse (..),
                                                 txBodySubmitTxResult,
                                                 unSignedTxWithFee)
-import           P2POnRamp.OrdersDB            (IniInfo (..), Order (..), SellerInfo (..),
-                                                createOrder, readOrdersDB,
-                                                setCompletedIfNull, setSellPostTxIfNull)
+import           P2POnRamp.OrdersDB            (IniInfo (..), Order (..),
+                                                SellerInfo (..), createOrder,
+                                                readOrdersDB,
+                                                setCompletedIfNull,
+                                                setSellPostTxIfNull)
 import qualified P2POnRamp.OrdersDB            as DB (CompletedType (Cancel))
 import           P2POnRamp.Utils               (hexToBuiltin', posixToMillis,
                                                 toHexText)
