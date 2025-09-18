@@ -20,7 +20,7 @@ import           System.FilePath            ((</>))
 
 import           P2POnRamp.Api.Context      (Ctx (..), badRequest, dbFile,
                                              internalErr, notFoundErr,
-                                             onRampPolicy)
+                                             onRampValidator)
 import           P2POnRamp.Api.Tx           (AddSubmitParams (..),
                                              SubmitTxResult (..),
                                              UnsignedTxResponse,
@@ -76,7 +76,7 @@ handleBuildBuyTx Ctx{..} path BuyCommit{..} = do
   let nid           = cfgNetworkId ctxCoreCfg
       providers     = ctxProviders
       buyerAddress  = head bcBuyerAddrs
-      onRampScriptE = onRampPolicy ctxOnRampParams
+      onRampScriptE = onRampValidator ctxOnRampParams
 
   onRampScript <- case onRampScriptE of
     Left err     -> internalErr err

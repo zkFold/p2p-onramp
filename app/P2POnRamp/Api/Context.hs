@@ -63,12 +63,11 @@ decodeOnRampParams orParams' = do
 
   return $ OnRampParams feeAddr feeVal feePKBytes
 
--- | Minting policy from OnRamp parameters decoded from JSON
-onRampPolicy :: OnRampParams' -> Either String (GYScript PlutusV3)
-onRampPolicy orParams' = do
+-- | Validator script from OnRamp parameters decoded from JSON
+onRampValidator :: OnRampParams' -> Either String (GYScript PlutusV3)
+onRampValidator orParams' = do
   orParams <- decodeOnRampParams orParams'
-  let mintScript = scriptFromPlutus @PlutusV3 $ onRampCompiled' orParams
-  return mintScript
+  return $ scriptFromPlutus @PlutusV3 $ onRampCompiled' orParams
 
 
 ------------------------- :Context & Setup: -------------------------

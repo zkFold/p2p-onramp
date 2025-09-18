@@ -29,7 +29,7 @@ import           System.FilePath               ((</>))
 
 import           P2POnRamp.Api.Context         (Ctx (..), badRequest, dbFile,
                                                 internalErr, notFoundErr,
-                                                onRampPolicy)
+                                                onRampValidator)
 import           P2POnRamp.Api.Tx              (AddSubmitParams (..),
                                                 SubmitTxResult (..),
                                                 UnsignedTxResponse (..),
@@ -139,7 +139,7 @@ handleBuildSellTx Ctx{..} path SellerTx{..} = do
   let nid           = cfgNetworkId ctxCoreCfg
       providers     = ctxProviders
       sellerAddress = head stSellerAddrs
-      onRampScriptE = onRampPolicy ctxOnRampParams
+      onRampScriptE = onRampValidator ctxOnRampParams
 
   onRampScript <- case onRampScriptE of
     Left err     -> internalErr err
@@ -219,7 +219,7 @@ handleBuildCancelTx Ctx{..} path CancelOrder{..} = do
   let nid           = cfgNetworkId ctxCoreCfg
       providers     = ctxProviders
       sellerAddress = head coSellerAddrs
-      onRampScriptE = onRampPolicy ctxOnRampParams
+      onRampScriptE = onRampValidator ctxOnRampParams
 
   onRampScript <- case onRampScriptE of
     Left err     -> internalErr err

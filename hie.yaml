@@ -1,10 +1,55 @@
 cradle:
   cabal:
-    - path: "./src"
+    - path: "src"
       component: "lib:p2p-onramp"
 
-    - path: "./app"
-      component: "p2p-onramp:exe:p2p-onramp-app"
+    - path: "backends/p2p-init-transaction/Main.hs"
+      component: "p2p-onramp:exe:p2p-init-transaction"
 
-    - path: "./tests"
+    - path: "backends/p2p-add-seller/Main.hs"
+      component: "p2p-onramp:exe:p2p-add-seller"
+
+    - path: "backends/p2p-choose-offer/Main.hs"
+      component: "p2p-onramp:exe:p2p-choose-offer"
+
+    - path: "backends/p2p-buy-order/Main.hs"
+      component: "p2p-onramp:exe:p2p-buy-order"
+
+    - path: "backends/p2p-claim-transaction/Main.hs"
+      component: "p2p-onramp:exe:p2p-claim-transaction"
+
+    - path: "tests"
       component: "p2p-onramp:test:p2p-onramp-test"
+
+    - path: "app/Main.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/Api.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/Api/Addr.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/Api/BuyerCommit.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/Api/BuyerClaim.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/Api/Context.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/Api/Seller.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/Api/SellOrders.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/Api/Tx.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/OrdersDB.hs"
+      component: "p2p-onramp:exe:p2p-server"
+
+    - path: "app/P2POnRamp/Utils.hs"
+      component: "p2p-onramp:exe:p2p-server"

@@ -10,7 +10,7 @@ import           GeniusYield.GYConfig  (GYCoreConfig (..))
 import           GeniusYield.Types
 import           Prelude
 
-import           P2POnRamp.Api.Context (Ctx (..), badRequest, onRampPolicy)
+import           P2POnRamp.Api.Context (Ctx (..), badRequest, onRampValidator)
 
 
 --------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ import           P2POnRamp.Api.Context (Ctx (..), badRequest, onRampPolicy)
 
 handleGetOnRampAddr :: Ctx -> IO Text
 handleGetOnRampAddr ctx = do
-  case onRampPolicy $ ctxOnRampParams ctx of
+  case onRampValidator $ ctxOnRampParams ctx of
     Left err -> badRequest err
     Right onRampScript -> do
       let nid            = cfgNetworkId $ ctxCoreCfg ctx
