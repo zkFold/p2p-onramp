@@ -17,6 +17,14 @@ data KeyFile = KeyFile { cborHex :: String }
 instance FromJSON KeyFile where
     parseJSON = withObject "KeyFile" $ \v -> KeyFile <$> v .: "cborHex"
 
+-- | Get key from hex-encoded string
+eitherHexToKey :: String -> Either String B8.ByteString
+eitherHexToKey hexStr = do
+  rawBytes <- B16.decode $ B8.pack hexStr
+  if B8.length rawBytes >= 32
+    then Right $ B8.drop (B8.length rawBytes - 32) rawBytes
+    else Left "Unable to retrieve key's rawbytes"
+
 -- | Extract the last 32 bytes of a key
 extractKey :: FilePath -> IO (Either String B8.ByteString)
 extractKey filePath = do
@@ -24,11 +32,7 @@ extractKey filePath = do
 
   pure $ do
     KeyFile hexStr <- eitherDecode fileContent
-    rawBytes       <- B16.decode $ B8.pack hexStr
-
-    if B8.length rawBytes >= 32
-      then Right $ B8.drop (B8.length rawBytes - 32) rawBytes
-      else Left "Unable to retrieve rawbytes"
+    eitherHexToKey hexStr
 
 -- | Extract secret key
 extractSecretKey :: FilePath -> IO (Either String SecretKey)

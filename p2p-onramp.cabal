@@ -79,9 +79,9 @@ common options
 library
     import: options
     exposed-modules:
-      ZkFold.Cardano.UPLC.OnRamp
-      ZkFold.Cardano.Crypto.Utils
-      ZkFold.Cardano.P2P.Example
+     ZkFold.Cardano.UPLC.OnRamp
+     ZkFold.Cardano.Crypto.Utils
+     ZkFold.Cardano.P2P.Example
       ZkFold.Cardano.Parse.Utils
     build-depends:
       aeson                                      ,
@@ -209,3 +209,49 @@ test-suite p2p-onramp-test
       tasty-quickcheck               ,
       zkfold-cardano
     hs-source-dirs: tests
+
+executable p2p-server
+    import:           options
+    default-language: Haskell2010
+    ghc-options:      -rtsopts
+    main-is:          Main.hs
+    hs-source-dirs:   app
+    other-modules:
+      P2POnRamp.Api
+      P2POnRamp.Api.Addr
+      P2POnRamp.Api.BuyerCommit
+      P2POnRamp.Api.BuyerClaim
+      P2POnRamp.Api.Context
+      P2POnRamp.Api.Seller
+      P2POnRamp.Api.SellOrders
+      P2POnRamp.Api.Tx
+      P2POnRamp.OrdersDB
+      P2POnRamp.Utils
+    build-depends:
+      aeson                          ,
+      atlas-cardano                  ,
+      base              >= 4.9 && < 5,
+      base16-bytestring              ,
+      bytestring                     ,
+      cardano-api                    ,
+      cborg                          ,
+      cryptonite                     ,
+      data-default                   ,
+      directory                      ,
+      filepath                       ,
+      http-types                     ,
+      memory                         ,
+      p2p-onramp                     ,
+      plutus-ledger-api              ,
+      plutus-tx                      ,
+      plutus-tx-plugin               ,
+      servant                        ,
+      servant-server                 ,
+      text                           ,
+      time                           ,
+      transformers                   ,
+      unix                           ,
+      wai                            ,
+      wai-cors                       ,
+      warp                           ,
+      zkfold-cardano
