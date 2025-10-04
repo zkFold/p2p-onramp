@@ -2,46 +2,31 @@
 
 module P2POnRamp.Api where
 
-import Control.Exception (try)
-import Control.Monad.Trans.Except (ExceptT (..))
-import Network.Wai.Middleware.Cors
-import Servant
-import Prelude
+import           Control.Exception           (try)
+import           Control.Monad.Trans.Except  (ExceptT (..))
+import           Network.Wai.Middleware.Cors
+import           Prelude
+import           Servant
 
-import P2POnRamp.Api.BuyerClaim (
-    ClaimCrypto,
-    ClaimCryptoResponse,
-    FiatVerified,
-    FiatVerify,
-    handleBuildClaimTx,
-    handleFiatSign,
-    handleSubmitClaimTx,
- )
-import P2POnRamp.Api.BuyerCommit (
-    BuyCommit,
-    handleBuildBuyTx,
-    handleSubmitBuyTx,
- )
-import P2POnRamp.Api.Context (Ctx (..))
-import P2POnRamp.Api.SellOrders (SellOrder, handleSellOrders)
-import P2POnRamp.Api.Seller (
-    CancelOrder,
-    CancelOrderResponse,
-    NewOrder,
-    SellTxResponse,
-    SellerData,
-    SellerTx,
-    handleBuildCancelTx,
-    handleBuildSellTx,
-    handleSellerData,
-    handleSubmitCancelTx,
-    handleSubmitSellTx,
- )
-import P2POnRamp.Api.Tx (
-    AddSubmitParams,
-    SubmitTxResult,
-    UnsignedTxResponse,
- )
+import           P2POnRamp.Api.BuyerClaim    (ClaimCrypto, ClaimCryptoResponse,
+                                              FiatVerified, FiatVerify,
+                                              handleBuildClaimTx,
+                                              handleFiatSign,
+                                              handleSubmitClaimTx)
+import           P2POnRamp.Api.BuyerCommit   (BuyCommit, handleBuildBuyTx,
+                                              handleSubmitBuyTx)
+import           P2POnRamp.Api.Context       (Ctx (..))
+import           P2POnRamp.Api.Seller        (CancelOrder, CancelOrderResponse,
+                                              NewOrder, SellTxResponse,
+                                              SellerData, SellerTx,
+                                              handleBuildCancelTx,
+                                              handleBuildSellTx,
+                                              handleSellerData,
+                                              handleSubmitCancelTx,
+                                              handleSubmitSellTx)
+import           P2POnRamp.Api.SellOrders    (SellOrder, handleSellOrders)
+import           P2POnRamp.Api.Tx            (AddSubmitParams, SubmitTxResult,
+                                              UnsignedTxResponse)
 
 -- | Type for our Servant API.
 type API =

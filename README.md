@@ -2,7 +2,7 @@
 
 Trustless P2P on-ramp is a smart contract app that connects cryptocurrency sellers and buyers. A seller deposits funds into the smart contract and ask for a fiat payment. Once the payment is delivered, the buyer can generate a cryptographic proof and unlock the funds from the smart contract.
 
-Prototype web-app can be tested at (under construction...)
+Prototype web-app can be tested at https://p2p.zkfold.io/
 
 ## Web-app instructions
 
