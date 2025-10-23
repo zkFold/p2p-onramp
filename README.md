@@ -57,3 +57,11 @@ The p2p-onramp server on this repository was written using the [Atlas](https://a
 ### p2p-onramp client
 
 The p2p-onramp frontend can be found [here](https://github.com/zkFold/p2p-onramp-client).
+
+## Test suite
+
+A comprehensive test suite for the *P2P-onramp* smart contract can be found in directory [./tests](./tests).  To run the tests, execute:
+```
+cabal test
+```
+
