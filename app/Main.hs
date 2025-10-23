@@ -1,16 +1,16 @@
 module Main where
 
-import Data.Aeson (eitherDecodeFileStrict)
-import GeniusYield.GYConfig (coreConfigIO, withCfgProviders)
-import Network.Wai.Handler.Warp
-import System.Directory (createDirectoryIfMissing)
-import System.Environment (getArgs)
-import System.FilePath ((</>))
-import Prelude
+import           Data.Aeson               (eitherDecodeFileStrict)
+import           GeniusYield.GYConfig     (coreConfigIO, withCfgProviders)
+import           Network.Wai.Handler.Warp
+import           Prelude
+import           System.Directory         (createDirectoryIfMissing)
+import           System.Environment       (getArgs)
+import           System.FilePath          ((</>))
 
-import P2POnRamp.Api (app)
-import P2POnRamp.Api.Context (Ctx (..), OnRampConfig (..), dbFile)
-import P2POnRamp.OrdersDB
+import           P2POnRamp.Api            (app)
+import           P2POnRamp.Api.Context    (Ctx (..), OnRampConfig (..), dbFile)
+import           P2POnRamp.OrdersDB
 
 -- | Getting path for our core configuration.
 parseArgs :: IO (FilePath, FilePath)
@@ -37,7 +37,7 @@ main = do
     putStrLn "parsing OnRamp config..."
     orConfigE <- eitherDecodeFileStrict onrampCfgPath
     let orConfig = case orConfigE of
-            Left err -> error $ "Error decoding JSON: " ++ err
+            Left err  -> error $ "Error decoding JSON: " ++ err
             Right cfg -> cfg
 
     putStrLn "Loading Proviers ..."
